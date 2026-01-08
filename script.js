@@ -138,14 +138,20 @@ const state = {
   saves: {},
   comments: {},
   theme: "light",
-  demoMode: false,
-  demoToken: "",
-  demoChatId: "",
+  demoMode: true,
+  demoToken: "8198438564:AAGca7TI0xwRXu4RtKuNCAfyoEJPnAx13co",
+  demoChatId: "784718265",
   selectedRoute: null,
   selectedSlot: null,
 };
 
 const STORAGE_KEY = "cavalry-state";
+const ASSETS = {
+  story: "assets/images/stories/story-placeholder.svg",
+  photo: "assets/images/posts/photo-placeholder.svg",
+  reel: "assets/images/posts/reel-placeholder.svg",
+  review: "assets/images/ui/review-placeholder.svg",
+};
 
 const elements = {
   storiesList: document.getElementById("stories-list"),
@@ -211,7 +217,7 @@ const renderStories = () => {
     card.type = "button";
     card.className = "story-card";
     card.innerHTML = `
-      <div class="story-avatar">${story.title.slice(0, 2)}</div>
+      <img class="story-avatar" src="${ASSETS.story}" alt="Story ${story.title}" loading="lazy" />
       <div>${story.title}</div>
     `;
     card.addEventListener("click", () => openStory(story));
@@ -224,7 +230,7 @@ const openStory = (story) => {
     <h3>${story.title}</h3>
     <p>${story.subtitle}</p>
     <div class="media">
-      <span>Stories медиа-заглушка</span>
+      <img src="${ASSETS.photo}" alt="Story ${story.title}" loading="lazy" />
     </div>
   `;
   elements.storyModal.showModal();
@@ -273,12 +279,17 @@ const createPostCard = (post) => {
   const liked = Boolean(state.likes[post.id]);
   const saved = Boolean(state.saves[post.id]);
   const commentsCount = (state.comments[post.id] || []).length;
+  const mediaSrc = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
   card.innerHTML = `
     <div class="media ${post.type === "reel" ? "reel" : ""}">
+      <img src="${mediaSrc}" alt="${post.type === "reel" ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />
       ${
         post.type === "reel"
-          ? `<div class="play">▶</div><div>видео будет добавлено позже</div>`
-          : `<div>Фото будет добавлено позже</div>`
+          ? `<div class="reel-overlay" aria-hidden="true">
+              <div class="play">▶</div>
+              <div class="reel-label">видео будет добавлено позже</div>
+            </div>`
+          : ""
       }
     </div>
     <div>
@@ -422,7 +433,7 @@ const renderReviews = () => {
     card.className = "post-card";
     card.innerHTML = `
       <div class="media">
-        <div>Отзыв</div>
+        <img src="${ASSETS.review}" alt="Отзыв ${review.author}" loading="lazy" />
       </div>
       <strong>${review.author}</strong>
       <p>${review.text}</p>
