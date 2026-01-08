@@ -1,0 +1,6 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Плейсхолдер обложки">
+  <rect width="1200" height="800" rx="48" fill="#8B5E3C" />
+  <rect x="60" y="60" width="1080" height="680" rx="32" stroke="#FFF4E6" stroke-width="6" />
+  <text x="120" y="200" fill="#FFF4E6" font-size="56" font-family="Segoe UI, sans-serif">hero</text>
+  <text x="120" y="280" fill="#FFF4E6" font-size="28" font-family="Segoe UI, sans-serif">placeholder</text>
+</svg>

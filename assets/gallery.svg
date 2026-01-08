@@ -1,0 +1,6 @@
+<svg width="900" height="600" viewBox="0 0 900 600" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Плейсхолдер галереи">
+  <rect width="900" height="600" rx="40" fill="#3F6C8C" />
+  <rect x="45" y="45" width="810" height="510" rx="28" stroke="#E6F5FF" stroke-width="6" />
+  <text x="90" y="180" fill="#E6F5FF" font-size="48" font-family="Segoe UI, sans-serif">gallery</text>
+  <text x="90" y="250" fill="#E6F5FF" font-size="24" font-family="Segoe UI, sans-serif">placeholder</text>
+</svg>
