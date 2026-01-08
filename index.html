@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Конная кавалерия — конные прогулки и прокат</title>
+    <meta
+      name="description"
+      content="Конные прогулки в долину и прокат лошадей. Конная кавалерия — безопасные маршруты, опытные инструкторы, уютная база." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="logo" href="#top">Конная кавалерия</a>
+      <button class="burger" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Открыть меню">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Основная навигация">
+        <a href="#advantages">Преимущества</a>
+        <a href="#services">Услуги</a>
+        <a href="#gallery">Галерея</a>
+        <a href="#reviews">Отзывы</a>
+        <a href="#faq">FAQ</a>
+        <a href="#contacts">Контакты</a>
+      </nav>
+      <a class="cta" href="#booking">Забронировать</a>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero__content">
+          <p class="eyebrow">Конные прогулки • Прокат • Инструкторы</p>
+          <h1>Откройте долину вместе с «Конной кавалерией»</h1>
+          <p>
+            Мы организуем прогулки по живописным маршрутам и бережно подберём лошадь под любой уровень. Вас ждут
+            тихие тропы, панорамы долины и атмосферная база в стиле ранчо.
+          </p>
+          <div class="hero__actions">
+            <a class="button" href="#booking">Хочу на прогулку</a>
+            <a class="button button--ghost" href="#services">Смотреть маршруты</a>
+          </div>
+          <div class="hero__info">
+            <span>Ежедневно 08:00–20:00</span>
+            <span>Инструктор всегда рядом</span>
+            <span>Семейные и индивидуальные туры</span>
+          </div>
+        </div>
+        <div class="hero__media" role="img" aria-label="Силуэт всадника на фоне долины"></div>
+      </section>
+
+      <section id="advantages" class="section">
+        <div class="section__head">
+          <h2>Почему выбирают нас</h2>
+          <p>Мы собрали опытную команду и продумали каждую деталь, чтобы прогулка была безопасной и запоминающейся.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <img src="assets/advantage.svg" alt="Ухоженная лошадь в стойле" />
+            <h3>Заботимся о лошадях</h3>
+            <p>Регулярные тренировки, спокойный темперамент и индивидуальный уход — залог комфортной прогулки.</p>
+          </article>
+          <article class="card">
+            <img src="assets/advantage.svg" alt="Инструктор помогает подобрать маршрут" />
+            <h3>Подберём маршрут</h3>
+            <p>Тихие тропы для новичков и насыщенные маршруты для уверенных всадников.</p>
+          </article>
+          <article class="card">
+            <img src="assets/advantage.svg" alt="Группа туристов на привале" />
+            <h3>Уютная база</h3>
+            <p>Тёплый чай, зона отдыха и фотолокации, чтобы сохранить впечатления.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="services" class="section section--alt">
+        <div class="section__head">
+          <h2>Услуги проката и прогулок</h2>
+          <p>Выбирайте формат и время — мы подстроимся под вашу компанию.</p>
+        </div>
+        <div class="cards cards--wide">
+          <article class="card card--service">
+            <img src="assets/service.svg" alt="Маршрут по лесной тропе" />
+            <div>
+              <h3>Прогулка в долину</h3>
+              <p>Главный маршрут «Конной кавалерии» с панорамными видами и мягким темпом.</p>
+              <ul>
+                <li>Длительность: 2 часа</li>
+                <li>Подходит для новичков</li>
+                <li>Фотопауза на смотровой</li>
+              </ul>
+            </div>
+          </article>
+          <article class="card card--service">
+            <img src="assets/service.svg" alt="Лошади в загоне" />
+            <div>
+              <h3>Прокат на территории</h3>
+              <p>Спокойный маршрут по территории базы с сопровождением инструктора.</p>
+              <ul>
+                <li>Длительность: 40 минут</li>
+                <li>Семейный формат</li>
+                <li>Безопасная площадка</li>
+              </ul>
+            </div>
+          </article>
+          <article class="card card--service">
+            <img src="assets/service.svg" alt="Вечерняя прогулка" />
+            <div>
+              <h3>Закатный маршрут</h3>
+              <p>Неспешная прогулка к обзорной точке, идеальна для свиданий и фотосессий.</p>
+              <ul>
+                <li>Длительность: 1,5 часа</li>
+                <li>Малые группы</li>
+                <li>Чай и пледы</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="gallery" class="section">
+        <div class="section__head">
+          <h2>Интерактивная фото-видео галерея</h2>
+          <p>Отметьте формат и посмотрите, как проходят наши прогулки.</p>
+        </div>
+        <div class="gallery__filters" role="tablist" aria-label="Фильтр галереи">
+          <button class="filter is-active" data-filter="all" role="tab" aria-selected="true">Все</button>
+          <button class="filter" data-filter="photo" role="tab" aria-selected="false">Фото</button>
+          <button class="filter" data-filter="video" role="tab" aria-selected="false">Видео</button>
+        </div>
+        <div class="gallery">
+          <figure class="gallery__item" data-type="photo">
+            <img src="assets/gallery.svg" alt="Прогулка по тропе" />
+            <figcaption>Утренняя тропа</figcaption>
+          </figure>
+          <figure class="gallery__item" data-type="video">
+            <img src="assets/gallery.svg" alt="Кадр из видео прогулки" />
+            <figcaption>Видео: путь в долину</figcaption>
+          </figure>
+          <figure class="gallery__item" data-type="photo">
+            <img src="assets/gallery.svg" alt="Группа на привале" />
+            <figcaption>Привал на обзорной точке</figcaption>
+          </figure>
+          <figure class="gallery__item" data-type="video">
+            <img src="assets/gallery.svg" alt="Кадр из вечернего маршрута" />
+            <figcaption>Видео: закатная прогулка</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section id="reviews" class="section section--alt">
+        <div class="section__head">
+          <h2>Отзывы гостей</h2>
+          <p>Нам доверяют семьи, пары и компании друзей. Спасибо за тёплые слова.</p>
+        </div>
+        <div class="cards">
+          <article class="card card--review">
+            <img src="assets/review.svg" alt="Фото посетительницы" />
+            <h3>Алина, Новосибирск</h3>
+            <p>«Первый раз на лошади — и сразу восторг! Инструктор всё объяснил, маршрут спокойный и красивый.»</p>
+          </article>
+          <article class="card card--review">
+            <img src="assets/review.svg" alt="Фото посетителя" />
+            <h3>Сергей, Томск</h3>
+            <p>«Выбрали закатную прогулку. Атмосфера волшебная, чай после маршрута стал приятным завершением.»</p>
+          </article>
+          <article class="card card--review">
+            <img src="assets/review.svg" alt="Фото семейной пары" />
+            <h3>Ольга и Илья</h3>
+            <p>«Ездили вдвоём, лошадей подобрали идеально. Хотим вернуться с детьми.»</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="faq" class="section">
+        <div class="section__head">
+          <h2>FAQ</h2>
+          <p>Ответы на частые вопросы перед первой прогулкой.</p>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Нужен ли опыт верховой езды?</summary>
+            <p>Нет, мы обучаем базовой посадке и управлению перед выездом. Маршрут адаптируем под уровень.</p>
+          </details>
+          <details>
+            <summary>Можно ли детям?</summary>
+            <p>Да, с 7 лет. Для младших предусмотрена площадка и пони-прогулки.</p>
+          </details>
+          <details>
+            <summary>Что надеть на прогулку?</summary>
+            <p>Закрытая обувь и удобная одежда по погоде. Шлемы мы предоставляем.</p>
+          </details>
+        </div>
+      </section>
+
+      <section id="contacts" class="section section--alt">
+        <div class="section__head">
+          <h2>Контакты</h2>
+          <p>Свяжитесь с нами и уточните детали. Отвечаем в течение 15 минут.</p>
+        </div>
+        <div class="contacts">
+          <div class="contacts__info">
+            <div class="info-block">
+              <h3>База</h3>
+              <p>Алтайский край, долина реки Катуни</p>
+              <p>Ежедневно: 08:00–20:00</p>
+            </div>
+            <div class="info-block">
+              <h3>Связаться</h3>
+              <p><a href="tel:+79001234567">+7 (900) 123-45-67</a></p>
+              <p><a href="mailto:hello@konkav.ru">hello@konkav.ru</a></p>
+              <p>Telegram: <a href="https://t.me/konkav_bot">@konkav_bot</a></p>
+            </div>
+            <div class="info-block" aria-label="Карта расположения">
+              <div class="map" role="img" aria-label="Схематичная карта расположения базы"></div>
+            </div>
+          </div>
+
+          <form id="booking" class="form" novalidate>
+            <h3>Заявка в Telegram-бота</h3>
+            <p>Оставьте заявку, и наш бот подтвердит время прогулки.</p>
+            <label>
+              Имя
+              <input type="text" name="name" autocomplete="name" required minlength="2" />
+              <span class="error" aria-live="polite"></span>
+            </label>
+            <label>
+              Телефон
+              <input type="tel" name="phone" autocomplete="tel" required placeholder="+7 900 123-45-67" />
+              <span class="error" aria-live="polite"></span>
+            </label>
+            <label>
+              Сообщение для бота
+              <textarea name="message" rows="4" required minlength="10"></textarea>
+              <span class="error" aria-live="polite"></span>
+            </label>
+            <button type="submit" class="button">Отправить заявку</button>
+            <p class="form__success" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>© 2024 Конная кавалерия. Все права защищены.</p>
+      <p>Безопасные маршруты, внимательные инструкторы, забота о лошадях.</p>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
