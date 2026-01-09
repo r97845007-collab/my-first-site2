@@ -56,8 +56,8 @@ return [
 
     'APP_ORIGIN' => 'https://your-domain.ru',
 
-    'TELEGRAM_BOT_TOKEN' => 'YOUR_BOT_TOKEN',
-    'TELEGRAM_CHAT_ID' => 'YOUR_CHAT_ID',
+    'TELEGRAM_OWNER_BOT_TOKEN' => 'YOUR_BOT_TOKEN',
+    'TELEGRAM_OWNER_CHAT_ID' => 'YOUR_CHAT_ID',
 ];
 ```
 
@@ -103,6 +103,7 @@ deploy/beget/db/schema.sql
 - `/` открывается
 - `/login.html` и `/register.html` открываются
 - `/dashboard.html` открывается
+- `/api/health.php` возвращает `{ ok: true }` и `db.ok: true` с таблицами
 - `/api/me.php` возвращает `401`, если вы не залогинены
 
 ---
