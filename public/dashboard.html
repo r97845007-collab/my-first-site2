@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Кабинет — Конная кавалерия</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <main class="dashboard-page">
+      <div class="dashboard-card">
+        <h1>Личный кабинет</h1>
+        <p class="hint">Управляйте контентом, календарём и Telegram-ботом.</p>
+
+        <section class="admin-item">
+          <h2>Профиль</h2>
+          <p>Вы вошли как: <strong id="profile-email">—</strong></p>
+          <button class="btn btn--ghost" id="logout-btn" type="button">Выйти</button>
+        </section>
+
+        <section class="admin-item">
+          <h2>Telegram Bot Token</h2>
+          <p class="hint">Токен хранится в базе в зашифрованном виде.</p>
+          <div class="form-grid">
+            <label class="input input--full">
+              <span>Bot Token</span>
+              <input id="bot-token" type="text" placeholder="123456:ABC-DEF" />
+            </label>
+          </div>
+          <div class="admin-item__actions">
+            <button class="btn" id="save-token" type="button">Сохранить</button>
+            <button class="btn btn--ghost" id="check-token" type="button">Проверить токен</button>
+          </div>
+          <p class="hint" id="token-status"></p>
+        </section>
+
+        <section>
+          <h2>Админка</h2>
+          <div class="tab-list" role="tablist">
+            <button class="tab-button is-active" data-tab="posts" type="button">Посты</button>
+            <button class="tab-button" data-tab="stories" type="button">Воспоминания</button>
+            <button class="tab-button" data-tab="calendar" type="button">Календарь</button>
+          </div>
+
+          <div class="tab-panel" data-panel="posts">
+            <h3>Добавить пост</h3>
+            <form id="post-form" class="form-grid" novalidate>
+              <label class="input">
+                <span>Тип</span>
+                <select name="type" required>
+                  <option value="photo">Фото</option>
+                  <option value="reel">Рилс</option>
+                  <option value="review">Отзыв</option>
+                </select>
+              </label>
+              <label class="input">
+                <span>Маршрут (тег)</span>
+                <input name="routeTag" type="text" />
+              </label>
+              <label class="input">
+                <span>Длительность</span>
+                <input name="durationLabel" type="text" />
+              </label>
+              <label class="input">
+                <span>Уровень</span>
+                <input name="levelLabel" type="text" />
+              </label>
+              <label class="input input--full">
+                <span>Подпись</span>
+                <textarea name="caption" rows="3" required></textarea>
+              </label>
+              <label class="input input--full">
+                <span>Хэштеги (через пробел)</span>
+                <input name="hashtags" type="text" />
+              </label>
+              <label class="input input--full">
+                <span>Медиа (фото/видео)</span>
+                <input name="media" type="file" accept="image/*,video/*" />
+              </label>
+              <button class="btn" type="submit">Опубликовать</button>
+            </form>
+            <h3>Список постов</h3>
+            <div class="admin-list" id="posts-list"></div>
+          </div>
+
+          <div class="tab-panel" data-panel="stories" hidden>
+            <h3>Добавить воспоминание</h3>
+            <form id="story-form" class="form-grid" novalidate>
+              <label class="input">
+                <span>Заголовок</span>
+                <input name="title" type="text" required />
+              </label>
+              <label class="input input--full">
+                <span>Текст</span>
+                <textarea name="text" rows="3"></textarea>
+              </label>
+              <label class="input input--full">
+                <span>Медиа (фото/видео)</span>
+                <input name="media" type="file" accept="image/*,video/*" />
+              </label>
+              <button class="btn" type="submit">Опубликовать</button>
+            </form>
+            <h3>Список воспоминаний</h3>
+            <div class="admin-list" id="stories-list-admin"></div>
+          </div>
+
+          <div class="tab-panel" data-panel="calendar" hidden>
+            <h3>Календарь и слоты</h3>
+            <p class="hint">Управляйте доступностью на ближайшие 30 дней.</p>
+            <form id="calendar-form" class="form-grid" novalidate>
+              <label class="input">
+                <span>Дата</span>
+                <input name="date" type="date" required />
+              </label>
+              <label class="input">
+                <span>Время</span>
+                <input name="time" type="time" required />
+              </label>
+              <label class="input">
+                <span>Маршрут (опционально)</span>
+                <input name="routeTag" type="text" />
+              </label>
+              <label class="input">
+                <span>Доступно?</span>
+                <select name="isAvailable">
+                  <option value="1">Да</option>
+                  <option value="0">Нет</option>
+                </select>
+              </label>
+              <button class="btn" type="submit">Сохранить слот</button>
+            </form>
+            <div class="admin-list" id="availability-list"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+    <script src="js/dashboard.js" defer></script>
+  </body>
+</html>

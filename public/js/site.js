@@ -138,9 +138,6 @@ const state = {
   saves: {},
   comments: {},
   theme: "light",
-  demoMode: true,
-  demoToken: "8198438564:AAGca7TI0xwRXu4RtKuNCAfyoEJPnAx13co",
-  demoChatId: "784718265",
   selectedRoute: null,
   selectedSlot: null,
 };
@@ -156,6 +153,7 @@ const ASSETS = {
 const elements = {
   storiesList: document.getElementById("stories-list"),
   feedGrid: document.getElementById("feed-grid"),
+  feedStatus: document.getElementById("feed-status"),
   showMore: document.getElementById("show-more"),
   filterChips: document.querySelectorAll(".chip"),
   feedSearch: document.getElementById("feed-search"),
@@ -166,10 +164,14 @@ const elements = {
   commentModal: document.getElementById("comment-modal"),
   commentList: document.getElementById("comment-list"),
   commentForm: document.getElementById("comment-form"),
-  integrationModal: document.getElementById("integration-modal"),
-  demoToggle: document.getElementById("demo-toggle"),
-  demoToken: document.getElementById("demo-token"),
-  demoChat: document.getElementById("demo-chat"),
+  reviewModal: document.getElementById("review-modal"),
+  reviewForm: document.getElementById("review-form"),
+  reviewFiles: document.getElementById("review-files"),
+  reviewPreview: document.getElementById("review-preview"),
+  reviewAlert: document.getElementById("review-alert"),
+  reviewStatus: document.getElementById("review-status"),
+  openReview: document.getElementById("open-review"),
+  reviewCta: document.getElementById("review-cta"),
   themeToggle: document.getElementById("theme-toggle"),
   menuToggle: document.getElementById("menu-toggle"),
   mobileMenu: document.getElementById("mobile-menu"),
@@ -185,6 +187,9 @@ const elements = {
 let activeFilter = "all";
 let visibleCount = 6;
 let activePostId = null;
+let postsData = [...posts];
+let storiesData = [...stories];
+let slotsData = [...slots];
 
 const saveState = () => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -198,9 +203,6 @@ const loadState = () => {
   state.saves = parsed.saves || {};
   state.comments = parsed.comments || {};
   state.theme = parsed.theme || "light";
-  state.demoMode = parsed.demoMode || false;
-  state.demoToken = parsed.demoToken || "";
-  state.demoChatId = parsed.demoChatId || "";
   state.selectedRoute = parsed.selectedRoute || null;
   state.selectedSlot = parsed.selectedSlot || null;
 };
@@ -210,15 +212,60 @@ const applyTheme = () => {
   elements.themeToggle.setAttribute("aria-pressed", state.theme === "dark");
 };
 
+const fetchJson = async (url, options = {}) => {
+  const response = await fetch(url, options);
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json") ? await response.json() : {};
+  if (!response.ok) {
+    const message = data.error || "Ошибка запроса";
+    throw new Error(message);
+  }
+  return data;
+};
+
+const parseHashtags = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : String(value).split(" ");
+  } catch (error) {
+    return String(value).split(" ");
+  }
+};
+
+const normalizePost = (post) => ({
+  ...post,
+  routeTag: post.routeTag || post.route_tag || "Маршрут",
+  durationLabel: post.durationLabel || post.duration_label || "",
+  level: post.level || post.level_label || "",
+  hashtags: parseHashtags(post.hashtags),
+  dateCreated: post.dateCreated || post.created_at || new Date().toISOString(),
+});
+
+const normalizeSlot = (slot) => ({
+  ...slot,
+  label: slot.label || slot.route_tag || "Свободный слот",
+});
+
+const scrollToFeed = () => {
+  const headerOffset = document.querySelector(".topbar")?.offsetHeight || 0;
+  const feed = document.getElementById("feed");
+  const top = feed.getBoundingClientRect().top + window.scrollY - headerOffset - 8;
+  window.scrollTo({ top, behavior: "smooth" });
+};
+
 const renderStories = () => {
   elements.storiesList.innerHTML = "";
-  stories.forEach((story) => {
+  storiesData.forEach((story) => {
+    const subtitle = story.subtitle || story.text || "Свежий момент";
     const card = document.createElement("button");
     card.type = "button";
     card.className = "story-card";
     card.innerHTML = `
-      <img class="story-avatar" src="${ASSETS.story}" alt="Story ${story.title}" loading="lazy" />
+      <img class="story-avatar" src="${ASSETS.story}" alt="Воспоминание ${story.title}" loading="lazy" />
       <div>${story.title}</div>
+      <small class="hint">${subtitle}</small>
     `;
     card.addEventListener("click", () => openStory(story));
     elements.storiesList.appendChild(card);
@@ -226,11 +273,15 @@ const renderStories = () => {
 };
 
 const openStory = (story) => {
+  const hasMedia = story.telegram_file_id && story.media_kind !== "none";
+  const mediaSrc = hasMedia
+    ? `/api/media?type=story&id=${story.id}&kind=${story.media_kind === "telegram_video" ? "video" : "photo"}`
+    : ASSETS.photo;
   elements.storyContent.innerHTML = `
     <h3>${story.title}</h3>
-    <p>${story.subtitle}</p>
+    <p>${story.subtitle || story.text || ""}</p>
     <div class="media">
-      <img src="${ASSETS.photo}" alt="Story ${story.title}" loading="lazy" />
+      <img src="${mediaSrc}" alt="Воспоминание ${story.title}" loading="lazy" />
     </div>
   `;
   elements.storyModal.showModal();
@@ -253,7 +304,7 @@ const matchesSearch = (post, query) => {
 
 const filteredPosts = () => {
   const query = elements.feedSearch.value.trim() || elements.globalSearch.value.trim();
-  return posts
+  return postsData
     .filter((post) => (activeFilter === "all" ? true : post.routeTag === activeFilter))
     .filter((post) => matchesSearch(post, query))
     .sort((a, b) => {
@@ -272,6 +323,14 @@ const renderPosts = () => {
   elements.showMore.hidden = visible.length >= list.length;
 };
 
+const resolvePostMediaSrc = (post) => {
+  if (post.telegram_file_id && post.media_kind && post.media_kind !== "none") {
+    const kind = post.media_kind === "telegram_video" ? "video" : "photo";
+    return `/api/media?type=post&id=${post.id}&kind=${kind}`;
+  }
+  return post.type === "reel" ? ASSETS.reel : ASSETS.photo;
+};
+
 const createPostCard = (post) => {
   const card = document.createElement("article");
   card.className = "post-card";
@@ -279,12 +338,13 @@ const createPostCard = (post) => {
   const liked = Boolean(state.likes[post.id]);
   const saved = Boolean(state.saves[post.id]);
   const commentsCount = (state.comments[post.id] || []).length;
-  const mediaSrc = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
+  const mediaSrc = resolvePostMediaSrc(post);
+  const isReel = post.type === "reel" || post.media_kind === "telegram_video";
   card.innerHTML = `
-    <div class="media ${post.type === "reel" ? "reel" : ""}">
-      <img src="${mediaSrc}" alt="${post.type === "reel" ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />
+    <div class="media ${isReel ? "reel" : ""}">
+      <img src="${mediaSrc}" alt="${isReel ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />
       ${
-        post.type === "reel"
+        isReel
           ? `<div class="reel-overlay" aria-hidden="true">
               <div class="play">▶</div>
               <div class="reel-label">видео будет добавлено позже</div>
@@ -373,21 +433,24 @@ const renderComments = () => {
 
 const renderSlots = () => {
   elements.slots.innerHTML = "";
-  slots.forEach((slot) => {
+  slotsData.forEach((slot) => {
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "slot-card";
+    card.className = `slot-card ${slot.is_available === 0 ? "is-disabled" : ""}`;
     card.innerHTML = `
       <strong>${slot.label}</strong>
       <p>${slot.date}</p>
       <p>${slot.time}</p>
     `;
+    if (slot.is_available === 0) {
+      card.disabled = true;
+    }
     elements.slots.appendChild(card);
   });
 };
 
 const renderWizardRoutes = () => {
-  const tags = Array.from(new Set(posts.map((post) => post.routeTag)));
+  const tags = Array.from(new Set(postsData.map((post) => post.routeTag)));
   elements.routeGrid.innerHTML = "";
   tags.forEach((tag) => {
     const card = document.createElement("button");
@@ -395,11 +458,15 @@ const renderWizardRoutes = () => {
     card.className = `route-card ${state.selectedRoute === tag ? "is-active" : ""}`;
     card.innerHTML = `
       <strong>${tag}</strong>
-      <p>${posts.find((post) => post.routeTag === tag)?.durationLabel || ""}</p>
+      <p>${postsData.find((post) => post.routeTag === tag)?.durationLabel || ""}</p>
     `;
     card.addEventListener("click", () => {
       state.selectedRoute = tag;
       saveState();
+      loadAvailability().then(() => {
+        renderSlots();
+        renderWizardSlots();
+      });
       renderWizardRoutes();
     });
     elements.routeGrid.appendChild(card);
@@ -408,32 +475,53 @@ const renderWizardRoutes = () => {
 
 const renderWizardSlots = () => {
   elements.slotGrid.innerHTML = "";
-  slots.forEach((slot) => {
+  slotsData.forEach((slot) => {
     const card = document.createElement("button");
     card.type = "button";
-    card.className = `slot-card ${state.selectedSlot === slot.id ? "is-active" : ""}`;
+    const isDisabled = slot.is_available === 0;
+    card.className = `slot-card ${state.selectedSlot === slot.id ? "is-active" : ""} ${
+      isDisabled ? "is-disabled" : ""
+    }`;
     card.innerHTML = `
       <strong>${slot.label}</strong>
       <p>${slot.date}</p>
       <p>${slot.time}</p>
     `;
     card.addEventListener("click", () => {
+      if (isDisabled) return;
       state.selectedSlot = slot.id;
       saveState();
       renderWizardSlots();
     });
+    if (isDisabled) {
+      card.disabled = true;
+    }
     elements.slotGrid.appendChild(card);
   });
 };
 
 const renderReviews = () => {
   elements.reviewGrid.innerHTML = "";
-  reviews.forEach((review) => {
+  const reviewPosts = postsData.filter((post) => post.type === "review");
+  const list = reviewPosts.length
+    ? reviewPosts.map((post) => ({
+        id: post.id,
+        author: post.caption.split("—")[0] || "Гость",
+        text: post.caption,
+        media_kind: post.media_kind,
+        telegram_file_id: post.telegram_file_id,
+      }))
+    : reviews;
+  list.forEach((review) => {
+    const hasMedia = review.telegram_file_id && review.media_kind && review.media_kind !== "none";
+    const mediaSrc = hasMedia
+      ? `/api/media?type=post&id=${review.id}&kind=${review.media_kind === "telegram_video" ? "video" : "photo"}`
+      : ASSETS.review;
     const card = document.createElement("article");
     card.className = "post-card";
     card.innerHTML = `
       <div class="media">
-        <img src="${ASSETS.review}" alt="Отзыв ${review.author}" loading="lazy" />
+        <img src="${mediaSrc}" alt="Отзыв ${review.author}" loading="lazy" />
       </div>
       <strong>${review.author}</strong>
       <p>${review.text}</p>
@@ -454,6 +542,7 @@ const setupFilters = () => {
       setActiveChip(chip);
       visibleCount = 6;
       renderPosts();
+      scrollToFeed();
     });
   });
   setActiveChip(elements.filterChips[0]);
@@ -488,8 +577,11 @@ const setupModals = () => {
     });
   });
 
-  document.getElementById("open-integration").addEventListener("click", () => {
-    elements.integrationModal.showModal();
+  [elements.openReview, elements.reviewCta].forEach((button) => {
+    if (!button) return;
+    button.addEventListener("click", () => {
+      elements.reviewModal.showModal();
+    });
   });
 };
 
@@ -601,20 +693,11 @@ const showErrors = (errors) => {
   }
 };
 
-const sendTelegram = async (payload) => {
-  if (state.demoMode && state.demoToken && state.demoChatId) {
-    const url = `https://api.telegram.org/bot${state.demoToken}/sendMessage`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: state.demoChatId, text: payload }),
-    });
-    return response.ok;
-  }
-  const response = await fetch("/api/telegram", {
+const sendLead = async (payload) => {
+  const response = await fetch("/api/lead-send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: payload }),
+    body: JSON.stringify(payload),
   });
   return response.ok;
 };
@@ -630,18 +713,20 @@ const setupForm = () => {
     showErrors(errors);
     if (Object.keys(errors).length) return;
 
-    const slot = slots.find((item) => item.id === state.selectedSlot);
-    const message = `Заявка с сайта\nМаршрут: ${state.selectedRoute}\nДата/время: ${
-      slot ? `${slot.date} ${slot.time}` : "—"
-    }\nИмя: ${formData.get("name")}\nТелефон: ${formData.get("phone")}\nКол-во людей: ${
-      formData.get("people")
-    }\nУровень: ${formData.get("level")}\nКомментарий: ${
-      formData.get("comment") || "—"
-    }\nИсточник: Сайт (my-first-site2)`;
-
     elements.telegramStatus.textContent = "Отправка...";
     try {
-      const success = await sendTelegram(message);
+      const slot = slotsData.find((item) => item.id === state.selectedSlot);
+      const success = await sendLead({
+        route: state.selectedRoute,
+        date: slot?.date || "",
+        time: slot?.time || "",
+        name: formData.get("name"),
+        phone: formData.get("phone"),
+        peopleCount: formData.get("people"),
+        level: formData.get("level"),
+        comment: formData.get("comment") || "",
+        source: "Сайт (my-first-site2)",
+      });
       if (success) {
         elements.telegramStatus.textContent = "Успешно отправлено!";
         elements.bookingForm.reset();
@@ -655,28 +740,93 @@ const setupForm = () => {
   });
 };
 
-const setupIntegration = () => {
-  elements.demoToggle.checked = state.demoMode;
-  elements.demoToken.value = state.demoToken;
-  elements.demoChat.value = state.demoChatId;
-
-  elements.demoToggle.addEventListener("change", () => {
-    state.demoMode = elements.demoToggle.checked;
-    saveState();
+const setupReviewForm = () => {
+  elements.reviewFiles.addEventListener("change", () => {
+    const files = Array.from(elements.reviewFiles.files || []);
+    elements.reviewPreview.innerHTML = files
+      .map(
+        (file) => `
+        <div class="file-preview__item">
+          <div>${file.name}</div>
+          <span>${Math.round(file.size / 1024)} KB</span>
+        </div>
+      `
+      )
+      .join("");
   });
 
-  [elements.demoToken, elements.demoChat].forEach((input) => {
-    input.addEventListener("input", () => {
-      state.demoToken = elements.demoToken.value.trim();
-      state.demoChatId = elements.demoChat.value.trim();
-      saveState();
+  elements.reviewForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(elements.reviewForm);
+    const text = formData.get("review-text").trim();
+    if (text.length < 10) {
+      elements.reviewAlert.textContent = "Отзыв должен быть минимум 10 символов.";
+      elements.reviewAlert.hidden = false;
+      return;
+    }
+    elements.reviewAlert.hidden = true;
+    const files = Array.from(elements.reviewFiles.files || []);
+    if (files.length > 5) {
+      elements.reviewAlert.textContent = "Можно загрузить не более 5 файлов.";
+      elements.reviewAlert.hidden = false;
+      return;
+    }
+    const payload = new FormData();
+    payload.append("name", formData.get("review-name"));
+    payload.append("rating", formData.get("review-rating"));
+    payload.append("text", text);
+    files.forEach((file) => {
+      if (file.type.startsWith("image/")) {
+        payload.append("photos", file);
+      } else if (file.type.startsWith("video/")) {
+        payload.append("videos", file);
+      }
     });
+    elements.reviewStatus.textContent = "Отправка...";
+    try {
+      await fetchJson("/api/review-submit", { method: "POST", body: payload });
+      elements.reviewStatus.textContent = "Спасибо! Отзыв отправлен.";
+      elements.reviewForm.reset();
+      elements.reviewPreview.innerHTML = "";
+    } catch (error) {
+      elements.reviewStatus.textContent = `Ошибка: ${error.message}`;
+    }
   });
 };
 
-const init = () => {
+const loadPublicData = async () => {
+  try {
+    const postsResponse = await fetchJson("/api/admin-posts?public=1");
+    postsData = (postsResponse.posts || postsData).map(normalizePost);
+    elements.feedStatus.textContent = "";
+  } catch (error) {
+    elements.feedStatus.textContent = "Показываем демо-ленту: сервер недоступен.";
+  }
+
+  try {
+    const storiesResponse = await fetchJson("/api/admin-stories?public=1");
+    storiesData = storiesResponse.stories || storiesData;
+  } catch (error) {
+    // fallback
+  }
+
+  await loadAvailability();
+};
+
+const loadAvailability = async () => {
+  try {
+    const routeParam = state.selectedRoute ? `?route=${encodeURIComponent(state.selectedRoute)}` : "";
+    const availabilityResponse = await fetchJson(`/api/availability${routeParam}`);
+    slotsData = (availabilityResponse.slots || slotsData).map(normalizeSlot);
+  } catch (error) {
+    // fallback
+  }
+};
+
+const init = async () => {
   loadState();
   applyTheme();
+  await loadPublicData();
   renderStories();
   renderSlots();
   renderWizardRoutes();
@@ -692,7 +842,7 @@ const init = () => {
   setupMenuToggle();
   setupWizard();
   setupForm();
-  setupIntegration();
+  setupReviewForm();
   renderPosts();
 };
 
