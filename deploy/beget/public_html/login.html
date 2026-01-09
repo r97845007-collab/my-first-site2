@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Вход — Конная кавалерия</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <main class="auth-page">
+      <div class="auth-card">
+        <h1>Вход</h1>
+        <p class="hint">Введите e-mail и пароль, чтобы открыть кабинет.</p>
+        <form id="login-form" class="form-grid" novalidate>
+          <label class="input input--full">
+            <span>Email</span>
+            <input type="email" name="email" required />
+          </label>
+          <label class="input input--full">
+            <span>Пароль</span>
+            <input type="password" name="password" minlength="8" required />
+          </label>
+          <div class="alert" role="alert" id="login-error" hidden></div>
+          <button class="btn" type="submit">Войти</button>
+        </form>
+        <p class="hint">
+          Нет аккаунта? <a href="/register">Зарегистрироваться</a>
+        </p>
+      </div>
+    </main>
+    <script src="/js/auth.js" defer></script>
+  </body>
+</html>

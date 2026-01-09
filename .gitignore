@@ -6,3 +6,5 @@ php-beget/config.local.php
 php-beget/tools/.admin_created
 
 public/api/config.local.php
+
+deploy/beget/public_html/api/config.local.php

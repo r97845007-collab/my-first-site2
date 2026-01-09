@@ -1,0 +1,57 @@
+CREATE TABLE users (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(190) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('admin') NOT NULL DEFAULT 'admin',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE media (
+  id VARCHAR(40) PRIMARY KEY,
+  telegram_file_id VARCHAR(255) NOT NULL,
+  kind ENUM('photo','video') NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE posts (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  type ENUM('post','memory','funnel') NOT NULL,
+  title VARCHAR(190) NULL,
+  body TEXT NOT NULL,
+  route_tag VARCHAR(64) NULL,
+  duration_label VARCHAR(32) NULL,
+  level_label VARCHAR(32) NULL,
+  hashtags TEXT NULL,
+  funnel_stage ENUM('idea','work','done') NULL,
+  media_id VARCHAR(40) NULL,
+  is_published TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE SET NULL
+);
+
+CREATE TABLE reviews (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NULL,
+  rating TINYINT UNSIGNED NULL,
+  text TEXT NOT NULL,
+  status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE review_media (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  review_id BIGINT UNSIGNED NOT NULL,
+  media_id VARCHAR(40) NOT NULL,
+  FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+  FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
+);
+
+CREATE TABLE availability (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  date DATE NOT NULL,
+  time_slot VARCHAR(16) NOT NULL,
+  route_tag VARCHAR(64) NULL,
+  is_available TINYINT(1) NOT NULL DEFAULT 1,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_slot (date, time_slot, route_tag)
+);

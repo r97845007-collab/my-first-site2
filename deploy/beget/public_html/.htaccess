@@ -1,0 +1,17 @@
+Options -Indexes
+
+<FilesMatch "(?i)config.*local.*\.php$">
+  Require all denied
+</FilesMatch>
+
+<FilesMatch "(?i)\.sql$">
+  Require all denied
+</FilesMatch>
+
+<FilesMatch "(?i)\.env.*">
+  Require all denied
+</FilesMatch>
+
+RewriteEngine On
+RewriteRule ^(lib|db)/ - [F,L]
+RewriteRule ^api/config\.local\.php$ - [F,L]
