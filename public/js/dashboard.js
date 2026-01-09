@@ -36,7 +36,7 @@ const showTab = (tab) => {
 
 const loadMe = async () => {
   try {
-    const data = await fetchJson("/api/me");
+    const data = await fetchJson("/api/me.php");
     profileEmail.textContent = data.email;
   } catch (error) {
     window.location.href = "/login";
@@ -46,7 +46,7 @@ const loadMe = async () => {
 const saveToken = async () => {
   tokenStatus.textContent = "Сохраняем...";
   try {
-    await fetchJson("/api/telegram-save-token", {
+    await fetchJson("/api/telegram-save-token.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ botToken: tokenInput.value.trim() }),
@@ -60,7 +60,7 @@ const saveToken = async () => {
 const checkToken = async () => {
   tokenStatus.textContent = "Проверяем...";
   try {
-    const data = await fetchJson("/api/telegram-status");
+    const data = await fetchJson("/api/telegram-status.php");
     tokenStatus.textContent = `Бот активен: ${data.telegram.username || data.telegram.first_name}`;
   } catch (error) {
     tokenStatus.textContent = `Ошибка: ${error.message}`;
@@ -68,7 +68,7 @@ const checkToken = async () => {
 };
 
 const loadPosts = async () => {
-  const data = await fetchJson("/api/admin-posts");
+  const data = await fetchJson("/api/admin-posts.php");
   postsList.innerHTML = data.posts
     .map(
       (post) => `
@@ -86,7 +86,7 @@ const loadPosts = async () => {
 };
 
 const loadStories = async () => {
-  const data = await fetchJson("/api/admin-stories");
+  const data = await fetchJson("/api/admin-stories.php");
   storiesList.innerHTML = data.stories
     .map(
       (story) => `
@@ -104,7 +104,7 @@ const loadStories = async () => {
 };
 
 const loadAvailability = async () => {
-  const data = await fetchJson("/api/admin-availability");
+  const data = await fetchJson("/api/admin-availability.php");
   availabilityList.innerHTML = data.slots
     .map(
       (slot) => `
@@ -127,7 +127,7 @@ const handlePostSubmit = async (event) => {
   event.preventDefault();
   try {
     const data = new FormData(postForm);
-    const response = await fetch("/api/admin-posts", {
+    const response = await fetch("/api/admin-posts.php", {
       method: "POST",
       credentials: "include",
       body: data,
@@ -147,7 +147,7 @@ const handleStorySubmit = async (event) => {
   event.preventDefault();
   try {
     const data = new FormData(storyForm);
-    const response = await fetch("/api/admin-stories", {
+    const response = await fetch("/api/admin-stories.php", {
       method: "POST",
       credentials: "include",
       body: data,
@@ -166,7 +166,7 @@ const handleStorySubmit = async (event) => {
 const handleCalendarSubmit = async (event) => {
   event.preventDefault();
   const data = new FormData(calendarForm);
-  await fetchJson("/api/admin-availability", {
+  await fetchJson("/api/admin-availability.php", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -189,13 +189,13 @@ const handleListAction = async (event, type) => {
 
   try {
     if (action === "delete") {
-      await fetchJson(`/api/admin-${type}?id=${id}`, { method: "DELETE" });
+      await fetchJson(`/api/admin-${type}.php?id=${id}`, { method: "DELETE" });
     }
 
     if (action === "edit") {
       const caption = prompt("Введите новый текст", item.querySelector("strong").textContent);
       if (caption) {
-        await fetchJson(`/api/admin-${type}`, {
+        await fetchJson(`/api/admin-${type}.php`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id, caption, title: caption }),
@@ -204,7 +204,7 @@ const handleListAction = async (event, type) => {
     }
 
     if (action === "toggle") {
-      await fetchJson(`/api/admin-availability`, {
+      await fetchJson(`/api/admin-availability.php`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, toggle: true }),
@@ -220,7 +220,7 @@ const handleListAction = async (event, type) => {
 };
 
 const logout = async () => {
-  await fetchJson("/api/auth-logout", { method: "POST" });
+  await fetchJson("/api/auth-logout.php", { method: "POST" });
   window.location.href = "/";
 };
 

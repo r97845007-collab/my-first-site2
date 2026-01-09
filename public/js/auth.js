@@ -15,7 +15,7 @@ const submitRegister = async (event) => {
     return;
   }
   try {
-    const response = await fetch("/api/auth-register", {
+    const response = await fetch("/api/auth-register.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -38,7 +38,7 @@ const submitLogin = async (event) => {
   const errorBox = document.getElementById("login-error");
   const data = new FormData(form);
   try {
-    const response = await fetch("/api/auth-login", {
+    const response = await fetch("/api/auth-login.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

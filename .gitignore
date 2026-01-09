@@ -4,3 +4,5 @@ node_modules/
 .env.local
 php-beget/config.local.php
 php-beget/tools/.admin_created
+
+public/api/config.local.php

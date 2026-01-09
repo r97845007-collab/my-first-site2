@@ -275,7 +275,7 @@ const renderStories = () => {
 const openStory = (story) => {
   const hasMedia = story.telegram_file_id && story.media_kind !== "none";
   const mediaSrc = hasMedia
-    ? `/api/media?type=story&id=${story.id}&kind=${story.media_kind === "telegram_video" ? "video" : "photo"}`
+    ? `/api/media.php?type=story&id=${story.id}&kind=${story.media_kind === "telegram_video" ? "video" : "photo"}`
     : ASSETS.photo;
   elements.storyContent.innerHTML = `
     <h3>${story.title}</h3>
@@ -326,7 +326,7 @@ const renderPosts = () => {
 const resolvePostMediaSrc = (post) => {
   if (post.telegram_file_id && post.media_kind && post.media_kind !== "none") {
     const kind = post.media_kind === "telegram_video" ? "video" : "photo";
-    return `/api/media?type=post&id=${post.id}&kind=${kind}`;
+    return `/api/media.php?type=post&id=${post.id}&kind=${kind}`;
   }
   return post.type === "reel" ? ASSETS.reel : ASSETS.photo;
 };
@@ -515,7 +515,7 @@ const renderReviews = () => {
   list.forEach((review) => {
     const hasMedia = review.telegram_file_id && review.media_kind && review.media_kind !== "none";
     const mediaSrc = hasMedia
-      ? `/api/media?type=post&id=${review.id}&kind=${review.media_kind === "telegram_video" ? "video" : "photo"}`
+      ? `/api/media.php?type=post&id=${review.id}&kind=${review.media_kind === "telegram_video" ? "video" : "photo"}`
       : ASSETS.review;
     const card = document.createElement("article");
     card.className = "post-card";
@@ -694,7 +694,7 @@ const showErrors = (errors) => {
 };
 
 const sendLead = async (payload) => {
-  const response = await fetch("/api/lead-send", {
+  const response = await fetch("/api/lead-send.php", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -784,7 +784,7 @@ const setupReviewForm = () => {
     });
     elements.reviewStatus.textContent = "Отправка...";
     try {
-      await fetchJson("/api/review-submit", { method: "POST", body: payload });
+      await fetchJson("/api/review-submit.php", { method: "POST", body: payload });
       elements.reviewStatus.textContent = "Спасибо! Отзыв отправлен.";
       elements.reviewForm.reset();
       elements.reviewPreview.innerHTML = "";
@@ -796,7 +796,7 @@ const setupReviewForm = () => {
 
 const loadPublicData = async () => {
   try {
-    const postsResponse = await fetchJson("/api/admin-posts?public=1");
+    const postsResponse = await fetchJson("/api/admin-posts.php?public=1");
     postsData = (postsResponse.posts || postsData).map(normalizePost);
     elements.feedStatus.textContent = "";
   } catch (error) {
@@ -804,7 +804,7 @@ const loadPublicData = async () => {
   }
 
   try {
-    const storiesResponse = await fetchJson("/api/admin-stories?public=1");
+    const storiesResponse = await fetchJson("/api/admin-stories.php?public=1");
     storiesData = storiesResponse.stories || storiesData;
   } catch (error) {
     // fallback
@@ -816,7 +816,7 @@ const loadPublicData = async () => {
 const loadAvailability = async () => {
   try {
     const routeParam = state.selectedRoute ? `?route=${encodeURIComponent(state.selectedRoute)}` : "";
-    const availabilityResponse = await fetchJson(`/api/availability${routeParam}`);
+    const availabilityResponse = await fetchJson(`/api/availability.php${routeParam}`);
     slotsData = (availabilityResponse.slots || slotsData).map(normalizeSlot);
   } catch (error) {
     // fallback
