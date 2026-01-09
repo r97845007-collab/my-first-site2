@@ -1,237 +1,196 @@
-# Конная кавалерия — продакшн-версия (Vercel + MySQL)
+# Конная кавалерия — PHP версия для Beget (из коробки)
 
-Этот репозиторий содержит готовый сайт в формате «лента как Instagram» и набор serverless‑эндпоинтов для Vercel:
+Эта ветка содержит **отдельную PHP‑версию сайта** для хостинга Beget. Она лежит в каталоге `php-beget/` и **не влияет на существующий HTML/CSS/JS сайт** в корне репозитория.
 
-- публичная часть: лента, воронка, контакты, карта;
-- личный кабинет и админка: логин/регистрация, управление контентом и календарём;
-- Telegram интеграция: заявки и отзывы с медиа.
-
-Ниже — подробная пошаговая инструкция, как всё запустить и настроить.
+Главная идея: вы копируете содержимое `php-beget/public` в `/public_html`, а приватную часть (`lib/`, `db/`, `tools/`, `config.local.php`) храните **вне** публичной директории.
 
 ---
 
-## 1) Быстрый запуск фронтенда локально
+## 1) Что куда копировать на Beget (важно!)
 
-**Самый простой способ:**
-1. Откройте `public/index.html` в браузере.
-2. Всё сразу отрисуется (лента, воронка, карта, отзывы).
+### 1.1. Публичная часть (DocumentRoot `/public_html`)
 
-**Если нужен авто‑рефреш:**
-1. Установите расширение **Live Server** для VS Code.
-2. Откройте проект в VS Code.
-3. Откройте `public/index.html` и нажмите **Open with Live Server**.
-
----
-
-## 2) Структура проекта (где что лежит)
+Скопируйте **всё содержимое** папки `php-beget/public/` прямо в `/public_html`:
 
 ```
-public/
-  index.html          # Главная страница
-  login.html          # Вход
-  register.html       # Регистрация
-  dashboard.html      # Кабинет + админка
-  css/style.css       # Все стили сайта
-  js/site.js          # Скрипты публичной части
-  js/auth.js          # Логин/регистрация
-  js/dashboard.js     # Кабинет/админка
-
-api/                 # Serverless функции Vercel
-lib/                 # Общие библиотеки (DB, JWT, crypto)
-db/schema.sql        # SQL‑схема для MySQL
-vercel.json          # Настройка Vercel
-package.json         # Зависимости
+/public_html
+  index.php
+  feed.php
+  funnel.php
+  reviews.php
+  request.php
+  login.php
+  logout.php
+  admin/
+  api/
+  assets/
+  _bootstrap_path.php
 ```
 
----
+### 1.2. Приватная часть (вне `/public_html`)
 
-## 3) База данных MySQL 5.7
+Создайте приватную папку, например:
 
-### 3.1. Поднять MySQL локально (пример)
-
-```bash
-# пример через Docker
-mkdir -p data
-
-docker run --name cavalry-mysql \
-  -e MYSQL_ROOT_PASSWORD=secret \
-  -e MYSQL_DATABASE=cavalry \
-  -p 3306:3306 \
-  -v "$PWD/data":/var/lib/mysql \
-  -d mysql:5.7
+```
+/home/<user>/site-private/horse-site/
 ```
 
-### 3.2. Применить схему
+И положите туда:
 
-```bash
-# подключитесь к mysql
-mysql -u root -p -h 127.0.0.1 -P 3306
-
-# затем в mysql shell
-USE cavalry;
-SOURCE db/schema.sql;
+```
+php-beget/lib/
+php-beget/db/
+php-beget/tools/
+php-beget/config.local.php
 ```
 
 ---
 
-## 4) Переменные окружения (Vercel)
+## 2) Настройка пути к приватной папке
 
-Откройте **Vercel → Settings → Environment Variables** и добавьте:
+В файле `/public_html/_bootstrap_path.php` **одна строка**:
 
-**MySQL:**
-- `MYSQL_HOST`
-- `MYSQL_PORT` (обычно `3306`)
-- `MYSQL_USER`
-- `MYSQL_PASSWORD`
-- `MYSQL_DATABASE`
-
-**JWT:**
-- `JWT_SECRET` (длинная случайная строка)
-
-**AES‑256‑GCM для Telegram токена пользователя:**
-- `MASTER_KEY` (32 байта в base64)
-
-**Origin сайта:**
-- `APP_ORIGIN` (например `https://your-site.vercel.app`)
-
-**Telegram (для заявок/отзывов сайта):**
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-
-### Пример значений для Telegram (НЕ добавляйте в код)
-Используйте эти значения только в Vercel → Environment Variables:
-
-```
-TELEGRAM_BOT_TOKEN = 8198438564:AAGca7TI0xwRXu4RtKuNCAfyoEJPnAx13co
-TELEGRAM_CHAT_ID   = 784718265
+```php
+define('APP_PRIVATE_PATH', '/home/<user>/site-private/horse-site');
 ```
 
-**Важно:** токены и секреты НЕ должны быть в репозитории.
+Замените путь на свой приватный каталог. Это единственное место, где нужно менять путь.
 
 ---
 
-## 5) Как сгенерировать MASTER_KEY (AES‑256‑GCM)
+## 3) Настройка конфигурации (config.local.php)
 
-MASTER_KEY должен быть **строкой base64**, которая соответствует **32 байтам**.
+1. Скопируйте `php-beget/config.local.sample.php` в `php-beget/config.local.php`.
+2. Заполните значения:
 
-Пример генерации (Node.js):
+```php
+return [
+  'DB_HOST' => '127.0.0.1',
+  'DB_PORT' => 3306,
+  'DB_NAME' => 'horse_site',
+  'DB_USER' => 'db_user',
+  'DB_PASS' => 'db_pass',
 
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+  // 32 байта в base64
+  'MASTER_KEY' => 'BASE64_32_BYTES',
+
+  'APP_ORIGIN' => 'https://your-domain.ru',
+
+  'TELEGRAM_OWNER_BOT_TOKEN' => 'YOUR_BOT_TOKEN',
+  'TELEGRAM_OWNER_CHAT_ID' => 'YOUR_CHAT_ID',
+
+  'CREATE_ADMIN_TOKEN' => 'CHANGE_ME',
+];
 ```
 
-Скопируйте вывод и вставьте в `MASTER_KEY`.
+### Как сгенерировать MASTER_KEY
+
+Нужен **32‑байтный ключ в base64**. Пример генерации:
+
+```
+php -r "echo base64_encode(random_bytes(32)) . PHP_EOL;"
+```
 
 ---
 
-## 6) Регистрация и вход
+## 4) Создание базы данных и импорт схемы
 
-1. Перейдите на `/register`.
-2. Создайте аккаунт (email + пароль). Пароль минимум 8 символов.
-3. После регистрации попадёте в `/dashboard`.
-4. Для входа: `/login`.
+1. Создайте БД в панели Beget.
+2. Импортируйте файл `php-beget/db/schema.sql`.
 
-JWT хранится в **HttpOnly cookie** `session`.
-
----
-
-## 7) Кабинет и админка
-
-Откройте `/dashboard`:
-
-### A) Профиль
-- показывает ваш email;
-- кнопка «Выйти» очищает cookie.
-
-### B) Telegram Bot Token
-- вводите токен в поле;
-- «Сохранить» → `/api/telegram-save-token` (токен шифруется AES‑256‑GCM и хранится в БД);
-- «Проверить» → `/api/telegram-status` (проверка через Telegram `getMe`).
-
-### C) Посты (лента)
-- форма добавления поста (тип, подпись, теги, медиа);
-- медиа загружается в Telegram владельца → сохраняется `telegram_file_id`;
-- список постов: редактирование текста / удаление.
-
-### D) Воспоминания
-- аналогичный CRUD, но для Stories‑формата.
-
-### E) Календарь
-- добавление слотов и управление доступностью.
+Таблицы:
+- `users` (админ)
+- `posts` (post/memory/funnel)
+- `media` (Telegram file_id)
+- `reviews` + `review_media`
+- `availability`
 
 ---
 
-## 8) Как добавить пост/воспоминание с медиа
+## 5) Первичный админ (create_admin.php)
 
-1. В `dashboard.html` выберите вкладку «Посты» или «Воспоминания».
-2. Заполните форму.
-3. Выберите файл (фото/видео).
-4. Нажмите «Опубликовать».
+Скрипт лежит в `php-beget/tools/create_admin.php` (в приватной зоне). Его **нельзя держать публично** постоянно.
 
-Файл отправляется в Telegram, и сайт автоматически использует `file_id` через `/api/media`.
+### Безопасный способ (рекомендуется для Beget)
 
----
-
-## 9) Как работает отправка заявок
-
-Форма воронки на `index.html` отправляет данные на `/api/lead-send`.
-
-Сервер:
-- валидирует поля,
-- отправляет сообщение в Telegram владельцу (через env‑переменные),
-- возвращает `{ ok: true }`.
-
----
-
-## 10) Как работает отправка отзывов
-
-Кнопка **«Оставить отзыв»** открывает модалку:
-
-- имя, рейтинг, текст (минимум 10 символов),
-- до 5 файлов (фото/видео).
-
-Сервер:
-- отправляет текст в Telegram владельца,
-- медиа отправляет в Telegram (`sendPhoto`, `sendVideo`, `sendMediaGroup`),
-- сохраняет отзыв в таблицу `reviews_inbox` (для модерации).
+1. Временно скопируйте `create_admin.php` в `/public_html/tools/`.
+2. Создайте в `/public_html/tools/.htaccess`:
+   ```
+   Deny from all
+   ```
+3. Временно разрешите доступ только через токен:
+   - Откройте URL:
+     ```
+     https://your-domain.ru/tools/create_admin.php?token=ВАШ_ТОКЕН
+     ```
+4. Создайте администратора (email + пароль минимум 10 символов).
+5. Скрипт создаст маркер `/tools/.admin_created`.
+6. **Удалите create_admin.php из публичной зоны**.
 
 ---
 
-## 11) Публичная часть и фолбэки
+## 6) Проверка основных URL
 
-Публичный фронтенд сначала пытается загрузить данные из API:
+После установки должны работать:
 
-- `/api/admin-posts?public=1`
-- `/api/admin-stories?public=1`
-- `/api/availability`
-
-Если API недоступно — показываются демо‑данные и предупреждение.
-
----
-
-## 12) Обновление стилей и контента
-
-- Основные стили: `public/css/style.css` (CSS‑переменные в начале файла).
-- Скрипты сайта: `public/js/site.js`.
-- Демо‑данные (фолбэк) лежат в верхней части `public/js/site.js`.
+- `/` — главная
+- `/feed.php` — лента
+- `/funnel.php` — воронка
+- `/reviews.php` — отзывы + форма
+- `/request.php` — заявка
+- `/login.php` — вход
+- `/admin/` — админка
 
 ---
 
-## 13) Контакты
+## 7) Админка (CRUD + календарь)
 
-- Телефон: **+7 (988) 341-50-48**
-- Яндекс Карты: https://yandex.ru/maps/org/konnaya_kavaleriya/181659825778/?ll=38.164409%2C44.545723&z=17
+В админке доступны:
+
+- **Посты** (`/admin/posts.php`)
+- **Воспоминания** (`/admin/memories.php`)
+- **Воронка** (`/admin/funnel.php`)
+- **Отзывы (модерация)** (`/admin/reviews.php`)
+- **Календарь** (`/admin/calendar.php`)
+- **Медиа библиотека** (`/admin/media-library.php`)
+
+Все публикации появляются на публичной части **только после админки**.
 
 ---
 
-## 14) Важно про безопасность
+## 8) Telegram интеграция
 
-- Токены/секреты **никогда не коммитьте** в репозиторий.
-- Все секреты должны быть только в переменных окружения Vercel.
-- JWT хранится только в HttpOnly cookie.
+- Токен и chat_id берутся только из `config.local.php`.
+- Заявки с `/request.php` → Telegram владельцу.
+- Отзывы с `/reviews.php` → Telegram владельцу + запись в БД со статусом `pending`.
+- Медиа хранится как **Telegram file_id** в таблице `media`.
+
+### Прокси медиа
+
+Доступ к медиа идёт через `/api/media.php?id=...`. Скрипт отдаёт файл **только если запись опубликована или отзыв одобрен**.
 
 ---
 
-## 15) Лицензия
+## 9) Безопасность
 
-См. файл `LICENSE`.
+- `config.local.php` и папка `lib/` находятся вне `public_html`.
+- Админка защищена сессиями и CSRF.
+- `media.php` выдаёт только опубликованные/одобренные файлы.
+- create_admin.php одноразовый и после использования удаляется.
+
+---
+
+## 10) Подсказки по наполнению
+
+1. Сначала создайте посты/воспоминания в админке.
+2. Потом добавьте этапы воронки.
+3. Настройте календарь слотов.
+4. Проверьте публичные страницы и форму заявки.
+
+---
+
+Если что-то не работает — проверьте:
+- путь `APP_PRIVATE_PATH`
+- корректность DB‑настроек
+- наличие таблиц после импорта schema.sql
+- доступность Telegram токена
