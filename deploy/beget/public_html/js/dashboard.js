@@ -39,7 +39,7 @@ const loadMe = async () => {
     const data = await fetchJson("/api/me.php");
     profileEmail.textContent = data.email;
   } catch (error) {
-    window.location.href = "/login";
+    window.location.href = "/login.html";
   }
 };
 

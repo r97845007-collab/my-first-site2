@@ -26,7 +26,7 @@ const submitRegister = async (event) => {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "Ошибка регистрации");
-    window.location.href = "/dashboard";
+    window.location.href = "/dashboard.html";
   } catch (error) {
     showError(errorBox, error.message);
   }
@@ -49,7 +49,7 @@ const submitLogin = async (event) => {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "Ошибка входа");
-    window.location.href = "/dashboard";
+    window.location.href = "/dashboard.html";
   } catch (error) {
     showError(errorBox, error.message);
   }
