@@ -111,6 +111,15 @@ function requireAdmin(): array
     return $user;
 }
 
+function requireLogin(): array
+{
+    $user = current_user();
+    if (!$user) {
+        sendError(401, 'Unauthorized');
+    }
+    return $user;
+}
+
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
     sendError(403, 'Forbidden');
 }

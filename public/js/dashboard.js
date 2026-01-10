@@ -31,6 +31,14 @@ const calendarForm = document.getElementById("calendar-form");
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabPanels = document.querySelectorAll(".tab-panel");
 
+const renderMediaPreview = (item) => {
+  if (!item?.media_url) return "";
+  if (item.media_kind === "video") {
+    return `<video class="admin-thumb" controls src="${item.media_url}"></video>`;
+  }
+  return `<img class="admin-thumb" src="${item.media_url}" alt="Медиа" loading="lazy" />`;
+};
+
 const showTab = (tab) => {
   tabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.tab === tab);
@@ -81,6 +89,7 @@ const loadPosts = async () => {
       <div class="admin-item" data-id="${post.id}">
         <strong>${post.caption}</strong>
         <div class="hint">${post.type} · ${post.route_tag || "без тега"}</div>
+        ${renderMediaPreview(post)}
         <div class="admin-item__actions">
           <button class="btn btn--ghost" data-action="edit">Редактировать</button>
           <button class="btn btn--ghost" data-action="delete">Удалить</button>
@@ -97,8 +106,9 @@ const loadStories = async () => {
     .map(
       (story) => `
       <div class="admin-item" data-id="${story.id}">
-        <strong>${story.title}</strong>
-        <div class="hint">${story.text || "Без описания"}</div>
+        <strong>${story.title || story.caption}</strong>
+        <div class="hint">${story.text || story.body || "Без описания"}</div>
+        ${renderMediaPreview(story)}
         <div class="admin-item__actions">
           <button class="btn btn--ghost" data-action="edit">Редактировать</button>
           <button class="btn btn--ghost" data-action="delete">Удалить</button>

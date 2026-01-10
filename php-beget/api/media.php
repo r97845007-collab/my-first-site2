@@ -32,6 +32,7 @@ if (!$allowed) {
 }
 
 $fileId = $media[0]['telegram_file_id'];
+$kind = $media[0]['kind'] ?? 'photo';
 $token = telegram_token();
 
 if ($token === '') {
@@ -51,15 +52,46 @@ if ($filePath === '') {
 
 $fileUrl = 'https://api.telegram.org/file/bot' . $token . '/' . $filePath;
 
+$httpCode = 0;
+$contentType = null;
+$contentTypeSet = false;
+$fallbackType = $kind === 'video' ? 'video/mp4' : 'image/jpeg';
+
+header('Cache-Control: public, max-age=86400');
+header('X-Content-Type-Options: nosniff');
+header('X-Media-Proxy: 1');
+
 $ch = curl_init($fileUrl);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-$content = curl_exec($ch);
-$info = curl_getinfo($ch);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$contentType, &$httpCode, &$contentTypeSet, $fallbackType) {
+    if (str_starts_with($header, 'HTTP/')) {
+        $parts = explode(' ', trim($header));
+        $httpCode = isset($parts[1]) ? (int) $parts[1] : 0;
+    }
+    if (stripos($header, 'Content-Type:') === 0) {
+        $contentType = trim(substr($header, strlen('Content-Type:')));
+        if ($httpCode === 200 && !$contentTypeSet) {
+            header('Content-Type: ' . $contentType);
+            $contentTypeSet = true;
+        }
+    }
+    return strlen($header);
+});
+curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $data) use (&$httpCode, &$contentTypeSet, $fallbackType) {
+    if ($httpCode !== 200) {
+        return strlen($data);
+    }
+    if (!$contentTypeSet) {
+        header('Content-Type: ' . $fallbackType);
+        $contentTypeSet = true;
+    }
+    echo $data;
+    return strlen($data);
+});
+curl_exec($ch);
+$infoCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-if (!$content) {
+if (($httpCode ?: $infoCode) !== 200) {
     sendError(404, 'Not found');
 }
-
-header('Content-Type: ' . ($info['content_type'] ?? 'application/octet-stream'));
-echo $content;

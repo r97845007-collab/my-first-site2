@@ -681,6 +681,14 @@ td {
   flex-wrap: wrap;
 }
 
+.admin-thumb {
+  max-width: 100%;
+  border-radius: 12px;
+  margin-top: 8px;
+  max-height: 240px;
+  object-fit: cover;
+}
+
 .comment-body {
   display: grid;
   gap: 12px;

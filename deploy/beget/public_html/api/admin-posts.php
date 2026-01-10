@@ -14,6 +14,9 @@ if ($method === 'GET') {
              WHERE p.is_published = 1 AND p.type IN ('post','memory')
              ORDER BY p.created_at DESC"
         );
+        foreach ($rows as &$row) {
+            $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
+        }
         sendJson(200, ['ok' => true, 'posts' => $rows]);
     }
 
@@ -25,6 +28,9 @@ if ($method === 'GET') {
          LEFT JOIN media m ON p.media_id = m.id
          ORDER BY p.created_at DESC"
     );
+    foreach ($rows as &$row) {
+        $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
+    }
     sendJson(200, ['ok' => true, 'posts' => $rows]);
 }
 

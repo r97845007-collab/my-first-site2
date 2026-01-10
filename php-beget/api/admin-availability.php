@@ -20,7 +20,7 @@ if ($method === 'GET') {
             $conditions[] = '(route_tag = ? OR route_tag IS NULL OR route_tag = "")';
             $params[] = $routeTag;
         }
-        $sql = 'SELECT id, date, time_slot, route_tag, is_available FROM availability WHERE ' . implode(' AND ', $conditions) . ' ORDER BY date ASC, time_slot ASC';
+        $sql = 'SELECT id, date, time_slot, route_tag, is_available, time_slot AS time FROM availability WHERE ' . implode(' AND ', $conditions) . ' ORDER BY date ASC, time_slot ASC';
         $rows = db_query($sql, $params);
         sendJson(200, ['ok' => true, 'slots' => $rows]);
     }

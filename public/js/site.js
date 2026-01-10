@@ -274,17 +274,26 @@ const renderStories = () => {
 };
 
 const openStory = (story) => {
-  const hasMedia = story.telegram_file_id && story.media_kind !== "none";
-  const mediaSrc = hasMedia
-    ? `/api/media.php?type=story&id=${story.id}&kind=${story.media_kind === "telegram_video" ? "video" : "photo"}`
-    : ASSETS.photo;
+  const mediaUrl = story.media_url || "";
+  const mediaKind = story.media_kind === "video" || story.media_kind === "telegram_video" ? "video" : "photo";
+  const hasMedia = Boolean(mediaUrl);
   elements.storyContent.innerHTML = `
     <h3>${story.title}</h3>
     <p>${story.subtitle || story.text || ""}</p>
     <div class="media">
-      <img src="${mediaSrc}" alt="Воспоминание ${story.title}" loading="lazy" />
+      ${
+        hasMedia && mediaKind === "video"
+          ? `<video src="${mediaUrl}" controls preload="metadata"></video>`
+          : `<img src="${hasMedia ? mediaUrl : ASSETS.photo}" alt="Воспоминание ${story.title}" loading="lazy" />`
+      }
     </div>
   `;
+  const img = elements.storyContent.querySelector("img");
+  if (img && !hasMedia) {
+    img.addEventListener("error", () => {
+      img.src = ASSETS.photo;
+    });
+  }
   elements.storyModal.showModal();
 };
 
@@ -331,16 +340,17 @@ const createPostCard = (post) => {
   const liked = Boolean(state.likes[post.id]);
   const saved = Boolean(state.saves[post.id]);
   const commentsCount = (state.comments[post.id] || []).length;
-  const mediaSrc =
-    post.telegram_file_id && post.media_kind && post.media_kind !== "none"
-      ? `/api/media.php?type=post&id=${post.id}&kind=${post.media_kind === "telegram_video" ? "video" : "photo"}`
-      : post.type === "reel"
-        ? ASSETS.reel
-        : ASSETS.photo;
-  const isReel = post.type === "reel" || post.media_kind === "telegram_video";
+  const mediaKind = post.media_kind === "video" || post.media_kind === "telegram_video" ? "video" : "photo";
+  const mediaUrl = post.media_url || "";
+  const fallbackSrc = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
+  const isReel = post.type === "reel" || post.media_kind === "telegram_video" || mediaKind === "video";
   card.innerHTML = `
     <div class="media ${isReel ? "reel" : ""}">
-      <img src="${mediaSrc}" alt="${isReel ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />
+      ${
+        mediaUrl && mediaKind === "video"
+          ? `<video src="${mediaUrl}" controls preload="metadata"></video>`
+          : `<img src="${mediaUrl || fallbackSrc}" alt="${isReel ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />`
+      }
       ${
         isReel
           ? `<div class="reel-overlay" aria-hidden="true">
@@ -379,6 +389,12 @@ const createPostCard = (post) => {
   card.querySelectorAll("button[data-action]").forEach((button) => {
     button.addEventListener("click", () => handlePostAction(post, button.dataset.action));
   });
+  const img = card.querySelector("img");
+  if (img) {
+    img.addEventListener("error", () => {
+      img.src = fallbackSrc;
+    });
+  }
 
   return card;
 };
@@ -511,19 +527,27 @@ const renderReviews = () => {
       }))
     : reviews;
   list.forEach((review) => {
-    const hasMedia = review.telegram_file_id && review.media_kind && review.media_kind !== "none";
-    const mediaSrc = hasMedia
-      ? `/api/media.php?type=post&id=${review.id}&kind=${review.media_kind === "telegram_video" ? "video" : "photo"}`
-      : ASSETS.review;
+    const mediaKind = review.media_kind === "video" || review.media_kind === "telegram_video" ? "video" : "photo";
+    const mediaUrl = review.media_url || "";
     const card = document.createElement("article");
     card.className = "post-card";
     card.innerHTML = `
       <div class="media">
-        <img src="${mediaSrc}" alt="Отзыв ${review.author}" loading="lazy" />
+        ${
+          mediaUrl && mediaKind === "video"
+            ? `<video src="${mediaUrl}" controls preload="metadata"></video>`
+            : `<img src="${mediaUrl || ASSETS.review}" alt="Отзыв ${review.author}" loading="lazy" />`
+        }
       </div>
       <strong>${review.author}</strong>
       <p>${review.text}</p>
     `;
+    const img = card.querySelector("img");
+    if (img) {
+      img.addEventListener("error", () => {
+        img.src = ASSETS.review;
+      });
+    }
     elements.reviewGrid.appendChild(card);
   });
 };
@@ -813,8 +837,8 @@ const loadPublicData = async () => {
 
 const loadAvailability = async () => {
   try {
-    const routeParam = state.selectedRoute ? `?route=${encodeURIComponent(state.selectedRoute)}` : "";
-    const availabilityResponse = await fetchJson(`/api/availability.php${routeParam}`);
+    const routeParam = state.selectedRoute ? `&route_tag=${encodeURIComponent(state.selectedRoute)}` : "";
+    const availabilityResponse = await fetchJson(`/api/admin-availability.php?public=1${routeParam}`);
     slotsData = (availabilityResponse.slots || slotsData).map(normalizeSlot);
   } catch (error) {
     // fallback

@@ -52,6 +52,15 @@ CREATE TABLE availability (
   UNIQUE KEY uniq_slot (date, time_slot, route_tag)
 );
 
+CREATE TABLE user_telegram (
+  user_id BIGINT UNSIGNED PRIMARY KEY,
+  bot_token_enc TEXT NOT NULL,
+  bot_token_iv VARCHAR(64) NOT NULL,
+  bot_token_tag VARCHAR(64) NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE reviews_inbox (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(120) NULL,

@@ -4,6 +4,22 @@ require_once __DIR__ . '/bootstrap.php';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'GET') {
+    $isPublic = ($_GET['public'] ?? '') === '1';
+    if ($isPublic) {
+        $rows = db_query(
+            "SELECT p.id, p.type, p.title, p.body AS text, p.route_tag, p.duration_label, p.level_label, p.hashtags, p.funnel_stage, p.media_id,
+                    p.is_published, p.created_at, m.kind AS media_kind, m.telegram_file_id
+             FROM posts p
+             LEFT JOIN media m ON p.media_id = m.id
+             WHERE p.type = 'memory' AND p.is_published = 1
+             ORDER BY p.created_at DESC"
+        );
+        foreach ($rows as &$row) {
+            $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
+        }
+        sendJson(200, ['ok' => true, 'stories' => $rows]);
+    }
+
     requireAdmin();
     $rows = db_query(
         "SELECT p.id, p.type, p.title, p.body AS text, p.route_tag, p.duration_label, p.level_label, p.hashtags, p.funnel_stage, p.media_id,
@@ -13,6 +29,9 @@ if ($method === 'GET') {
          WHERE p.type = 'memory'
          ORDER BY p.created_at DESC"
     );
+    foreach ($rows as &$row) {
+        $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
+    }
     sendJson(200, ['ok' => true, 'stories' => $rows]);
 }
 
