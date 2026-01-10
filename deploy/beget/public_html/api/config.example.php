@@ -11,8 +11,8 @@ $example = [
 
     'APP_ORIGIN' => 'https://your-domain.ru',
 
-    'TELEGRAM_OWNER_BOT_TOKEN' => 'YOUR_BOT_TOKEN',
-    'TELEGRAM_OWNER_CHAT_ID' => 'YOUR_CHAT_ID',
+    'TELEGRAM_BOT_TOKEN' => 'YOUR_BOT_TOKEN',
+    'TELEGRAM_CHAT_ID' => 'YOUR_CHAT_ID',
 
     'CREATE_ADMIN_TOKEN' => 'CHANGE_ME',
 ];

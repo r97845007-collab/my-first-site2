@@ -56,8 +56,8 @@ return [
 
     'APP_ORIGIN' => 'https://your-domain.ru',
 
-    'TELEGRAM_OWNER_BOT_TOKEN' => 'YOUR_BOT_TOKEN',
-    'TELEGRAM_OWNER_CHAT_ID' => 'YOUR_CHAT_ID',
+    'TELEGRAM_BOT_TOKEN' => 'YOUR_BOT_TOKEN',
+    'TELEGRAM_CHAT_ID' => 'YOUR_CHAT_ID',
 ];
 ```
 
@@ -105,6 +105,18 @@ deploy/beget/db/schema.sql
 - `/dashboard.html` открывается
 - `/api/health.php` возвращает `{ ok: true }` и `db.ok: true` с таблицами
 - `/api/me.php` возвращает `401`, если вы не залогинены
+
+### Тест-план (админка и Telegram)
+
+1. Откройте `/api/health.php` → `ok=true`.
+2. Зарегистрируйтесь/войдите → `POST /api/auth-register.php` или `POST /api/auth-login.php`.
+3. Проверьте `/api/me.php` → `ok=true`, email пользователя.
+4. `GET /api/admin-posts.php` → список постов.
+5. Создайте пост без медиа, затем с медиа → `POST /api/admin-posts.php`.
+6. Откройте `/api/media.php?id=<media_id>` → файл отдаётся.
+7. `POST /api/admin-stories.php` → создаёт воспоминание (type=memory), оно видно в публичной выдаче.
+8. `POST /api/admin-availability.php` → создаёт слоты, `GET /api/availability.php` возвращает доступные.
+9. `GET /api/telegram-status.php` → возвращает `telegram` из `getMe`.
 
 ---
 

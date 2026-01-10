@@ -34,6 +34,10 @@ if (!$allowed) {
 $fileId = $media[0]['telegram_file_id'];
 $token = telegram_token();
 
+if ($token === '') {
+    sendError(500, 'Telegram token missing');
+}
+
 $getFileUrl = 'https://api.telegram.org/bot' . $token . '/getFile?file_id=' . urlencode($fileId);
 $response = json_decode(file_get_contents($getFileUrl), true);
 if (empty($response['ok'])) {
@@ -47,4 +51,15 @@ if ($filePath === '') {
 
 $fileUrl = 'https://api.telegram.org/file/bot' . $token . '/' . $filePath;
 
-sendJson(200, ['ok' => true, 'url' => $fileUrl]);
+$ch = curl_init($fileUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$content = curl_exec($ch);
+$info = curl_getinfo($ch);
+curl_close($ch);
+
+if (!$content) {
+    sendError(404, 'Not found');
+}
+
+header('Content-Type: ' . ($info['content_type'] ?? 'application/octet-stream'));
+echo $content;

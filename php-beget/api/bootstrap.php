@@ -102,6 +102,15 @@ function current_user(): ?array
     return $rows[0] ?? null;
 }
 
+function requireAdmin(): array
+{
+    $user = current_user();
+    if (!$user || ($user['role'] ?? '') !== 'admin') {
+        sendError(403, 'Forbidden');
+    }
+    return $user;
+}
+
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
     sendError(403, 'Forbidden');
 }

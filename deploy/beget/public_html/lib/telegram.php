@@ -1,12 +1,14 @@
 <?php
 function telegram_token(): string
 {
-    return $GLOBALS['config']['TELEGRAM_OWNER_BOT_TOKEN'];
+    $config = $GLOBALS['config'];
+    return $config['TELEGRAM_OWNER_BOT_TOKEN'] ?? $config['TELEGRAM_BOT_TOKEN'] ?? '';
 }
 
 function telegram_chat_id(): string
 {
-    return $GLOBALS['config']['TELEGRAM_OWNER_CHAT_ID'];
+    $config = $GLOBALS['config'];
+    return $config['TELEGRAM_OWNER_CHAT_ID'] ?? $config['TELEGRAM_CHAT_ID'] ?? '';
 }
 
 function telegram_request(string $method, array $payload, array $files = []): array
