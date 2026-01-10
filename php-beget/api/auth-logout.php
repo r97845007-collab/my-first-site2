@@ -1,8 +1,8 @@
 <?php
-require_once __DIR__ . '/_util.php';
+require_once __DIR__ . '/bootstrap.php';
 
-require_method('POST');
+requireMethod('POST');
 
 clear_session_cookie();
 
-json_response(['ok' => true], 200);
+sendJson(200, ['ok' => true]);

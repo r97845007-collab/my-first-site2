@@ -1,24 +1,24 @@
 <?php
-require_once __DIR__ . '/_util.php';
+require_once __DIR__ . '/bootstrap.php';
 
-require_method('POST');
+requireMethod('POST');
 
-$data = read_json_body();
+$data = parseJsonBody();
 $email = trim((string)($data['email'] ?? ''));
 $password = (string)($data['password'] ?? '');
 
 if ($email === '' || $password === '') {
-    json_response(['error' => 'Email and password are required'], 400);
+    sendError(400, 'Email and password are required');
 }
 
 $rows = db_query('SELECT id, email, password_hash FROM users WHERE email = ?', [$email]);
 if (!$rows) {
-    json_response(['error' => 'Invalid credentials'], 401);
+    sendError(401, 'Invalid credentials');
 }
 
 $user = $rows[0];
 if (!password_verify($password, $user['password_hash'])) {
-    json_response(['error' => 'Invalid credentials'], 401);
+    sendError(401, 'Invalid credentials');
 }
 
 $payload = [
@@ -29,4 +29,4 @@ $payload = [
 $token = jwt_create($payload);
 set_session_cookie($token, 60 * 60 * 24 * 7);
 
-json_response(['ok' => true, 'user' => ['id' => (int) $user['id'], 'email' => $user['email']]], 200);
+sendJson(200, ['ok' => true]);

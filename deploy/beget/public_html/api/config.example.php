@@ -1,5 +1,5 @@
 <?php
-return [
+$example = [
     'DB_HOST' => '127.0.0.1',
     'DB_PORT' => 3306,
     'DB_NAME' => 'horse_site',
@@ -16,3 +16,11 @@ return [
 
     'CREATE_ADMIN_TOKEN' => 'CHANGE_ME',
 ];
+
+if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($example, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+return $example;

@@ -1,58 +1,43 @@
 <?php
-require_once __DIR__ . '/_bootstrap.php';
+ini_set('display_errors', '0');
 
-function json_response(array $data, int $status = 200): void
-{
-    http_response_code($status);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    exit;
+require_once __DIR__ . '/../lib/http.php';
+
+set_exception_handler(function () {
+    sendError(500, 'Server error');
+});
+
+set_error_handler(function () {
+    sendError(500, 'Server error');
+});
+
+$configPath = __DIR__ . '/config.local.php';
+if (!file_exists($configPath)) {
+    sendError(500, 'Server error');
 }
 
-function require_method(string $method): void
-{
-    if (($_SERVER['REQUEST_METHOD'] ?? '') !== $method) {
-        json_response(['error' => 'Method Not Allowed'], 405);
-    }
+$config = require $configPath;
+if (!is_array($config)) {
+    sendError(500, 'Server error');
 }
 
-function read_json_body(): array
-{
-    $raw = file_get_contents('php://input');
-    if ($raw === false || $raw === '') {
-        return [];
-    }
-    $data = json_decode($raw, true);
-    if (!is_array($data)) {
-        json_response(['error' => 'Invalid JSON'], 400);
-    }
-    return $data;
-}
+$GLOBALS['config'] = $config;
 
-function base64url_encode(string $data): string
-{
-    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-}
-
-function base64url_decode(string $data): string
-{
-    $remainder = strlen($data) % 4;
-    if ($remainder) {
-        $data .= str_repeat('=', 4 - $remainder);
-    }
-    return base64_decode(strtr($data, '-_', '+/'));
-}
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/crypto.php';
+require_once __DIR__ . '/../lib/telegram.php';
 
 function jwt_create(array $payload): string
 {
     $header = ['alg' => 'HS256', 'typ' => 'JWT'];
     $segments = [
-        base64url_encode(json_encode($header)),
-        base64url_encode(json_encode($payload)),
+        rtrim(strtr(base64_encode(json_encode($header)), '+/', '-_'), '='),
+        rtrim(strtr(base64_encode(json_encode($payload)), '+/', '-_'), '='),
     ];
     $signingInput = implode('.', $segments);
     $signature = hash_hmac('sha256', $signingInput, crypto_key(), true);
-    $segments[] = base64url_encode($signature);
+    $segments[] = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
     return implode('.', $segments);
 }
 
@@ -64,11 +49,12 @@ function jwt_verify(string $token): ?array
     }
     [$headerB64, $payloadB64, $signatureB64] = $parts;
     $signingInput = $headerB64 . '.' . $payloadB64;
-    $expected = base64url_encode(hash_hmac('sha256', $signingInput, crypto_key(), true));
+    $expected = rtrim(strtr(base64_encode(hash_hmac('sha256', $signingInput, crypto_key(), true)), '+/', '-_'), '=');
     if (!hash_equals($expected, $signatureB64)) {
         return null;
     }
-    $payload = json_decode(base64url_decode($payloadB64), true);
+    $payloadJson = base64_decode(strtr($payloadB64, '-_', '+/'));
+    $payload = json_decode($payloadJson, true);
     if (!is_array($payload)) {
         return null;
     }
@@ -114,4 +100,8 @@ function current_user(): ?array
     }
     $rows = db_query('SELECT id, email, role FROM users WHERE id = ?', [$payload['sub']]);
     return $rows[0] ?? null;
+}
+
+if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
+    sendError(403, 'Forbidden');
 }

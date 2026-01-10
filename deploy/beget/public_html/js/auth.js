@@ -1,5 +1,14 @@
 const getForm = (id) => document.getElementById(id);
 
+const readJsonOrThrow = async (response) => {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`Server returned non-JSON (HTTP ${response.status}).`);
+  }
+};
+
 const showError = (element, message) => {
   element.textContent = message;
   element.hidden = !message;
@@ -24,7 +33,7 @@ const submitRegister = async (event) => {
         password: data.get("password"),
       }),
     });
-    const payload = await response.json();
+    const payload = await readJsonOrThrow(response);
     if (!response.ok) throw new Error(payload.error || "Ошибка регистрации");
     window.location.href = "/dashboard.html";
   } catch (error) {
@@ -47,7 +56,7 @@ const submitLogin = async (event) => {
         password: data.get("password"),
       }),
     });
-    const payload = await response.json();
+    const payload = await readJsonOrThrow(response);
     if (!response.ok) throw new Error(payload.error || "Ошибка входа");
     window.location.href = "/dashboard.html";
   } catch (error) {

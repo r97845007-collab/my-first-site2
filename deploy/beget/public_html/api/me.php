@@ -1,11 +1,16 @@
 <?php
-require_once __DIR__ . '/_util.php';
+require_once __DIR__ . '/bootstrap.php';
 
-require_method('GET');
+requireMethod('GET');
 
 $user = current_user();
 if (!$user) {
-    json_response(['error' => 'Unauthorized'], 401);
+    sendError(401, 'Unauthorized');
 }
 
-json_response(['id' => (int) $user['id'], 'email' => $user['email'], 'role' => $user['role']], 200);
+sendJson(200, [
+    'ok' => true,
+    'id' => (int) $user['id'],
+    'email' => $user['email'],
+    'role' => $user['role'],
+]);

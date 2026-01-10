@@ -1,6 +1,12 @@
 const fetchJson = async (url, options = {}) => {
   const response = await fetch(url, { credentials: "include", ...options });
-  const data = await response.json();
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`Server returned non-JSON (HTTP ${response.status}).`);
+  }
   if (!response.ok) {
     throw new Error(data.error || "Ошибка запроса");
   }
