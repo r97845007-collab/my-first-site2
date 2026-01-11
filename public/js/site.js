@@ -140,6 +140,7 @@ const state = {
   theme: "light",
   selectedRoute: null,
   selectedSlot: null,
+  selectedDate: null,
 };
 
 const STORAGE_KEY = "cavalry-state";
@@ -183,13 +184,21 @@ const elements = {
   favoritesModal: document.getElementById("favorites-modal"),
   favoritesList: document.getElementById("favorites-list"),
   favoritesEmpty: document.getElementById("favorites-empty"),
-  slots: document.getElementById("slots"),
+  calendarGrid: document.getElementById("calendar-grid"),
+  calendarMonth: document.getElementById("calendar-month"),
+  calendarPrev: document.getElementById("calendar-prev"),
+  calendarNext: document.getElementById("calendar-next"),
+  calendarSlots: document.getElementById("calendar-slots"),
+  calendarDayTitle: document.getElementById("calendar-day-title"),
   routeGrid: document.getElementById("route-grid"),
   slotGrid: document.getElementById("slot-grid"),
   bookingForm: document.getElementById("booking-form"),
   formAlert: document.getElementById("form-alert"),
   telegramStatus: document.getElementById("telegram-status"),
   reviewGrid: document.getElementById("review-grid"),
+  reelViewer: document.getElementById("reel-viewer"),
+  reelTrack: document.getElementById("reel-track"),
+  reelClose: document.getElementById("reel-close"),
 };
 
 let activeFilter = "all";
@@ -203,6 +212,7 @@ let feedHasMore = true;
 let feedLoading = false;
 let feedFromApi = false;
 let feedSentinel = null;
+let reelObserver = null;
 
 const saveState = () => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -218,6 +228,7 @@ const loadState = () => {
   state.theme = parsed.theme || "light";
   state.selectedRoute = parsed.selectedRoute || null;
   state.selectedSlot = parsed.selectedSlot || null;
+  state.selectedDate = parsed.selectedDate || null;
 };
 
 const applyTheme = () => {
@@ -271,7 +282,13 @@ const normalizePost = (post) => ({
 const normalizeSlot = (slot) => ({
   ...slot,
   label: slot.label || slot.route_tag || "Свободный слот",
+  time: slot.time || slot.time_slot || "",
 });
+
+const routeLabel = (tag) => {
+  if (!tag || tag === "all") return "Все маршруты";
+  return tag;
+};
 
 const scrollToFeed = () => {
   const headerOffset = document.querySelector(".topbar")?.offsetHeight || 0;
@@ -381,11 +398,11 @@ const createPostCard = (post) => {
     <div class="media ${isReel ? "reel" : ""}">
       ${
         mediaUrl && mediaKind === "video"
-          ? `<video src="${mediaUrl}" controls preload="metadata"></video>`
+          ? `<video src="${mediaUrl}" playsinline controls preload="metadata"></video>`
           : `<img src="${mediaUrl || fallbackSrc}" alt="${isReel ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />`
       }
       ${
-        isReel
+        isReel && !mediaUrl
           ? `<div class="reel-overlay" aria-hidden="true">
               <div class="play">▶</div>
               <div class="reel-label">видео будет добавлено позже</div>
@@ -427,6 +444,11 @@ const createPostCard = (post) => {
     img.addEventListener("error", () => {
       img.src = fallbackSrc;
     });
+  }
+  if (isReel && mediaUrl) {
+    const media = card.querySelector(".media");
+    media.classList.add("is-clickable");
+    media.addEventListener("click", () => openReelViewer(post.id));
   }
 
   return card;
@@ -493,6 +515,113 @@ const renderFavorites = () => {
   elements.favoritesEmpty.hidden = savedPosts.length > 0;
 };
 
+const getReelPosts = () =>
+  postsData.filter(
+    (post) =>
+      post.media_url &&
+      (post.type === "reel" || post.media_kind === "video" || post.media_kind === "telegram_video")
+  );
+
+const openReelViewer = (postId) => {
+  if (!elements.reelViewer || !elements.reelTrack) return;
+  const reels = getReelPosts();
+  if (!reels.length) return;
+  elements.reelTrack.innerHTML = "";
+  reels.forEach((post) => {
+    const item = document.createElement("section");
+    item.className = "reel-item";
+    item.dataset.postId = post.id;
+    item.innerHTML = `
+      <video src="${post.media_url}" playsinline controls preload="metadata"></video>
+    `;
+    elements.reelTrack.appendChild(item);
+  });
+  elements.reelViewer.showModal();
+  document.body.classList.add("body--locked");
+
+  const index = Math.max(
+    0,
+    reels.findIndex((post) => post.id === postId)
+  );
+  const scrollTarget = elements.reelTrack.clientHeight * index;
+  elements.reelTrack.scrollTop = scrollTarget;
+
+  if (reelObserver) {
+    reelObserver.disconnect();
+  }
+  reelObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const video = entry.target.querySelector("video");
+        if (!video) return;
+        if (entry.isIntersecting) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      });
+    },
+    { threshold: 0.6 }
+  );
+  Array.from(elements.reelTrack.children).forEach((item) => reelObserver.observe(item));
+};
+
+const closeReelViewer = () => {
+  if (!elements.reelViewer?.open) return;
+  elements.reelViewer.close();
+  document.body.classList.remove("body--locked");
+  Array.from(elements.reelTrack.querySelectorAll("video")).forEach((video) => video.pause());
+  if (reelObserver) {
+    reelObserver.disconnect();
+    reelObserver = null;
+  }
+};
+
+const setupReelViewer = () => {
+  if (!elements.reelViewer || !elements.reelTrack || !elements.reelClose) return;
+  elements.reelClose.addEventListener("click", closeReelViewer);
+  elements.reelViewer.addEventListener("click", (event) => {
+    if (event.target === elements.reelViewer) {
+      closeReelViewer();
+    }
+  });
+  elements.reelViewer.addEventListener("close", () => {
+    document.body.classList.remove("body--locked");
+    Array.from(elements.reelTrack.querySelectorAll("video")).forEach((video) => video.pause());
+    if (reelObserver) {
+      reelObserver.disconnect();
+      reelObserver = null;
+    }
+  });
+  elements.reelTrack.addEventListener(
+    "wheel",
+    (event) => {
+      if (!elements.reelViewer.open) return;
+      if (Math.abs(event.deltaY) < 10) return;
+      event.preventDefault();
+      const current = Math.round(elements.reelTrack.scrollTop / elements.reelTrack.clientHeight);
+      const next = event.deltaY > 0 ? current + 1 : current - 1;
+      const maxIndex = elements.reelTrack.children.length - 1;
+      const clamped = Math.min(Math.max(next, 0), maxIndex);
+      elements.reelTrack.scrollTo({ top: clamped * elements.reelTrack.clientHeight, behavior: "smooth" });
+    },
+    { passive: false }
+  );
+  document.addEventListener("keydown", (event) => {
+    if (!elements.reelViewer.open) return;
+    if (event.key === "Escape") {
+      closeReelViewer();
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      const current = Math.round(elements.reelTrack.scrollTop / elements.reelTrack.clientHeight);
+      const next = event.key === "ArrowDown" ? current + 1 : current - 1;
+      const maxIndex = elements.reelTrack.children.length - 1;
+      const clamped = Math.min(Math.max(next, 0), maxIndex);
+      elements.reelTrack.scrollTo({ top: clamped * elements.reelTrack.clientHeight, behavior: "smooth" });
+    }
+  });
+};
+
 const openComments = async (postId) => {
   activePostId = postId;
   if (feedFromApi) {
@@ -522,22 +651,108 @@ const renderComments = () => {
     .join("");
 };
 
-const renderSlots = () => {
-  elements.slots.innerHTML = "";
-  slotsData.forEach((slot) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = `slot-card ${slot.is_available === 0 ? "is-disabled" : ""}`;
-    card.innerHTML = `
-      <strong>${slot.label}</strong>
-      <p>${slot.date}</p>
-      <p>${slot.time}</p>
-    `;
-    if (slot.is_available === 0) {
-      card.disabled = true;
-    }
-    elements.slots.appendChild(card);
+let calendarCursor = new Date();
+
+const formatDate = (date) => date.toISOString().split("T")[0];
+
+const renderCalendarDay = () => {
+  if (!elements.calendarSlots || !elements.calendarDayTitle) return;
+  if (!state.selectedDate) {
+    elements.calendarDayTitle.textContent = "Выберите дату";
+    elements.calendarSlots.innerHTML = "";
+    return;
+  }
+  elements.calendarDayTitle.textContent = `Слоты на ${state.selectedDate}`;
+  const daySlots = slotsData
+    .filter((slot) => slot.date === state.selectedDate)
+    .sort((a, b) => a.time.localeCompare(b.time));
+  if (!daySlots.length) {
+    elements.calendarSlots.innerHTML = "<p class=\"hint\">Нет доступных слотов.</p>";
+    return;
+  }
+  const grouped = daySlots.reduce((acc, slot) => {
+    const key = slot.route_tag || "all";
+    acc[key] = acc[key] || [];
+    acc[key].push(slot);
+    return acc;
+  }, {});
+
+  elements.calendarSlots.innerHTML = "";
+  Object.keys(grouped).forEach((route) => {
+    const group = document.createElement("div");
+    group.className = "slot-group";
+    group.innerHTML = `<h4 class="slot-group__title">${routeLabel(route)}</h4>`;
+    const groupGrid = document.createElement("div");
+    groupGrid.className = "slot-grid";
+    grouped[route].forEach((slot) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = `slot-card ${slot.is_available ? "" : "is-disabled"}`;
+      card.innerHTML = `
+        <strong>${slot.time}</strong>
+        <p>${routeLabel(route)}</p>
+      `;
+      if (!slot.is_available) {
+        card.disabled = true;
+      }
+      card.addEventListener("click", () => {
+        if (!slot.is_available) return;
+        state.selectedSlot = slot.id;
+        saveState();
+        renderWizardSlots();
+      });
+      groupGrid.appendChild(card);
+    });
+    group.appendChild(groupGrid);
+    elements.calendarSlots.appendChild(group);
   });
+};
+
+const renderCalendar = () => {
+  if (!elements.calendarGrid || !elements.calendarMonth) return;
+  const monthStart = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), 1);
+  const monthEnd = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 0);
+  elements.calendarMonth.textContent = monthStart.toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  });
+  const weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  elements.calendarGrid.innerHTML = "";
+  weekdays.forEach((day) => {
+    const label = document.createElement("div");
+    label.className = "calendar-weekday";
+    label.textContent = day;
+    elements.calendarGrid.appendChild(label);
+  });
+  const offset = (monthStart.getDay() + 6) % 7;
+  for (let i = 0; i < offset; i++) {
+    const empty = document.createElement("div");
+    empty.className = "calendar-cell is-empty";
+    elements.calendarGrid.appendChild(empty);
+  }
+  for (let day = 1; day <= monthEnd.getDate(); day += 1) {
+    const date = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), day);
+    const dateString = formatDate(date);
+    const dateSlots = slotsData.filter((slot) => slot.date === dateString);
+    const availableCount = dateSlots.filter((slot) => slot.is_available).length;
+    const cell = document.createElement("div");
+    cell.className = "calendar-cell";
+    const meta = availableCount
+      ? `${availableCount} слота`
+      : dateSlots.length
+      ? "занято"
+      : "нет слотов";
+    cell.innerHTML = `
+      <button type="button" data-date="${dateString}">${day}</button>
+      <span class="calendar-cell__meta">${meta}</span>
+    `;
+    cell.querySelector("button").addEventListener("click", () => {
+      state.selectedDate = dateString;
+      saveState();
+      renderCalendarDay();
+    });
+    elements.calendarGrid.appendChild(cell);
+  }
 };
 
 const renderWizardRoutes = () => {
@@ -566,7 +781,12 @@ const renderWizardRoutes = () => {
 
 const renderWizardSlots = () => {
   elements.slotGrid.innerHTML = "";
-  slotsData.forEach((slot) => {
+  const filteredSlots = slotsData.filter((slot) => {
+    if (!slot.is_available) return false;
+    if (!state.selectedRoute) return true;
+    return slot.route_tag === "all" || slot.route_tag === state.selectedRoute;
+  });
+  filteredSlots.forEach((slot) => {
     const card = document.createElement("button");
     card.type = "button";
     const isDisabled = slot.is_available === 0;
@@ -574,9 +794,10 @@ const renderWizardSlots = () => {
       isDisabled ? "is-disabled" : ""
     }`;
     card.innerHTML = `
-      <strong>${slot.label}</strong>
+      <strong>${slot.label || routeLabel(slot.route_tag)}</strong>
+      <small class="hint">${routeLabel(slot.route_tag)}</small>
       <p>${slot.date}</p>
-      <p>${slot.time}</p>
+      <p>${slot.time || slot.time_slot}</p>
     `;
     card.addEventListener("click", () => {
       if (isDisabled) return;
@@ -626,6 +847,36 @@ const renderReviews = () => {
       });
     }
     elements.reviewGrid.appendChild(card);
+  });
+  initReviewCarousel();
+};
+
+const initReviewCarousel = () => {
+  if (!elements.reviewGrid) return;
+  if (!window.jQuery || !window.jQuery.fn?.slick) {
+    elements.reviewGrid.classList.add("review-grid--fallback");
+    return;
+  }
+  const $grid = window.jQuery(elements.reviewGrid);
+  if ($grid.hasClass("slick-initialized")) {
+    $grid.slick("unslick");
+  }
+  elements.reviewGrid.classList.remove("review-grid--fallback");
+  $grid.slick({
+    centerMode: true,
+    slidesToShow: 3,
+    arrows: true,
+    dots: true,
+    responsive: [
+      {
+        breakpoint: 1024,
+        settings: { slidesToShow: 2 },
+      },
+      {
+        breakpoint: 720,
+        settings: { slidesToShow: 1 },
+      },
+    ],
   });
 };
 
@@ -844,6 +1095,20 @@ const setupFavorites = () => {
     elements.menuToggle.setAttribute("aria-expanded", "false");
     renderFavorites();
     elements.favoritesModal.showModal();
+  });
+};
+
+const setupCalendarNavigation = () => {
+  if (!elements.calendarPrev || !elements.calendarNext) return;
+  elements.calendarPrev.addEventListener("click", () => {
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
+    renderCalendar();
+    renderCalendarDay();
+  });
+  elements.calendarNext.addEventListener("click", () => {
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
+    renderCalendar();
+    renderCalendarDay();
   });
 };
 
@@ -1079,9 +1344,20 @@ const loadPublicData = async () => {
 
 const loadAvailability = async () => {
   try {
-    const routeParam = state.selectedRoute ? `&route_tag=${encodeURIComponent(state.selectedRoute)}` : "";
-    const availabilityResponse = await fetchJson(`/api/admin-availability.php?public=1${routeParam}`);
+    const availabilityResponse = await fetchJson("/api/admin-availability.php?public=1");
     slotsData = (availabilityResponse.slots || slotsData).map(normalizeSlot);
+    if (!state.selectedDate && slotsData.length) {
+      const today = formatDate(new Date());
+      const dates = Array.from(new Set(slotsData.map((slot) => slot.date))).sort();
+      state.selectedDate = dates.includes(today) ? today : dates[0];
+      saveState();
+    }
+    if (state.selectedDate) {
+      const selected = new Date(state.selectedDate);
+      if (!Number.isNaN(selected.getTime())) {
+        calendarCursor = new Date(selected.getFullYear(), selected.getMonth(), 1);
+      }
+    }
   } catch (error) {
     // fallback
   }
@@ -1093,7 +1369,8 @@ const init = async () => {
   applyTopbarState();
   await loadPublicData();
   renderStories();
-  renderSlots();
+  renderCalendar();
+  renderCalendarDay();
   renderWizardRoutes();
   renderWizardSlots();
   renderReviews();
@@ -1107,6 +1384,8 @@ const init = async () => {
   setupThemeToggle();
   setupMenuToggle();
   setupFavorites();
+  setupReelViewer();
+  setupCalendarNavigation();
   setupWizard();
   setupForm();
   setupReviewForm();

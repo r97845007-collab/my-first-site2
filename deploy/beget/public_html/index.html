@@ -17,7 +17,16 @@
     <meta property="og:url" content="https://example.com" />
     <meta property="og:image" content="https://example.com/placeholder-og.jpg" />
     <meta name="theme-color" content="#0f172a" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/css/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css"
+    />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -199,7 +208,18 @@
             <h2>Календарь и слоты</h2>
             <p class="hint">Выберите удобный слот для прогулки — данные синхронизируются с заявкой.</p>
           </div>
-          <div class="slots" id="slots"></div>
+          <div class="calendar-ui">
+            <div class="calendar-header">
+              <button class="btn btn--ghost" id="calendar-prev" type="button">←</button>
+              <h3 id="calendar-month"></h3>
+              <button class="btn btn--ghost" id="calendar-next" type="button">→</button>
+            </div>
+            <div class="calendar-grid" id="calendar-grid"></div>
+          </div>
+          <div class="calendar-day" id="calendar-day">
+            <h3 id="calendar-day-title">Выберите дату</h3>
+            <div class="slot-grid" id="calendar-slots"></div>
+          </div>
         </section>
 
         <section class="funnel" id="funnel" aria-label="Воронка записи">
@@ -281,7 +301,7 @@
             <p>Поделитесь впечатлениями — добавьте фото или видео после прогулки.</p>
             <button class="btn" id="review-cta" type="button">Оставить отзыв</button>
           </div>
-          <div class="review-grid" id="review-grid"></div>
+          <div class="review-grid review-grid--fallback" id="review-grid"></div>
         </section>
 
         <section class="faq" id="faq" aria-label="Вопросы и ответы">
@@ -461,6 +481,15 @@
       </div>
     </dialog>
 
+    <dialog class="reel-viewer" id="reel-viewer" aria-label="Просмотр рилсов">
+      <div class="reel-viewer__content">
+        <button class="btn btn--ghost reel-viewer__close" id="reel-close" type="button">Закрыть</button>
+        <div class="reel-track" id="reel-track"></div>
+      </div>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
     <script src="/js/site.js" defer></script>
   </body>
 </html>

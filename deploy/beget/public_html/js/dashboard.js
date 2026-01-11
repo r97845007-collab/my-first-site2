@@ -126,7 +126,9 @@ const loadAvailability = async () => {
       (slot) => `
       <div class="admin-item" data-id="${slot.id}">
         <strong>${slot.date} ${slot.time_slot}</strong>
-        <div class="hint">Маршрут: ${slot.route_tag || "любой"} · ${
+        <div class="hint">Маршрут: ${
+          slot.route_tag && slot.route_tag !== "all" ? slot.route_tag : "Все маршруты"
+        } · ${
         slot.is_available ? "доступно" : "закрыто"
       }</div>
         <div class="admin-item__actions">
@@ -139,10 +141,20 @@ const loadAvailability = async () => {
     .join("");
 };
 
+const resolveRouteTag = (formData) => {
+  const selection = (formData.get("routeTag") || "").toString();
+  const custom = (formData.get("routeTagCustom") || "").toString().trim();
+  if (selection === "other") {
+    return custom || "all";
+  }
+  return selection || "all";
+};
+
 const handlePostSubmit = async (event) => {
   event.preventDefault();
   try {
     const data = new FormData(postForm);
+    data.set("routeTag", resolveRouteTag(data));
     const response = await fetch("/api/admin-posts.php", {
       method: "POST",
       credentials: "include",
@@ -182,13 +194,14 @@ const handleStorySubmit = async (event) => {
 const handleCalendarSubmit = async (event) => {
   event.preventDefault();
   const data = new FormData(calendarForm);
+  const routeTag = resolveRouteTag(data);
   await fetchJson("/api/admin-availability.php", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       date: data.get("date"),
       time_slot: data.get("time"),
-      route_tag: data.get("routeTag"),
+      route_tag: routeTag,
       is_available: Number(data.get("isAvailable")),
     }),
   });

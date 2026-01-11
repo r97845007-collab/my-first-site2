@@ -50,7 +50,7 @@ CREATE TABLE availability (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   date DATE NOT NULL,
   time_slot VARCHAR(16) NOT NULL,
-  route_tag VARCHAR(64) NULL,
+  route_tag VARCHAR(64) NOT NULL DEFAULT 'all',
   is_available TINYINT(1) NOT NULL DEFAULT 1,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_slot (date, time_slot, route_tag)

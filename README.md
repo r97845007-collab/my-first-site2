@@ -9,6 +9,21 @@
 
 ---
 
+## 0) Структура проекта (куда смотреть)
+
+Если ты только начинаешь разбираться, начни с этих файлов и папок:
+
+- **Фронтенд (публичный сайт)**: `public/index.html`, `public/css/style.css`, `public/js/site.js`.
+- **Админка**: `public/dashboard.html`, `public/js/dashboard.js`.
+- **Beget сборка**: `deploy/beget/public_html/` (это копия статики + PHP API).
+- **PHP API (Beget)**: `deploy/beget/public_html/api/*.php`.
+- **PHP утилиты**: `deploy/beget/public_html/lib/*.php`.
+- **Схема БД и миграции**: `db/schema.sql`, `db/migrations/*.sql`.
+
+> Важно: при деплое на Beget работаем только с `deploy/beget/public_html`.
+
+---
+
 ## 1) Что загрузить в public_html (Beget)
 
 В Beget публичный корень фиксирован: `/public_html`.
@@ -83,6 +98,10 @@ deploy/beget/db/schema.sql
 4. Если база уже создана ранее, примените миграции:
    - `deploy/beget/db/migrations/001_user_telegram.sql`
    - `deploy/beget/db/migrations/002_social.sql`
+   - `deploy/beget/db/migrations/003_availability_route_tag.sql` ← важно для уникальности слотов
+
+### Почему нужна миграция availability
+Она делает `route_tag` **NOT NULL** и ставит дефолт `all`, чтобы нельзя было создать два слота на одну дату и время.
 
 ---
 
@@ -127,6 +146,41 @@ deploy/beget/db/schema.sql
 14. `POST /api/admin-availability.php` → создаёт слот, выбор маршрута на сайте подтягивает слоты.
 15. `POST /api/admin-availability-generate.php` → генерирует слоты по диапазону.
 16. `POST /api/lead-send.php` → заявка приходит владельцу в Telegram.
+
+---
+
+## 6) Админка (кратко)
+
+- Вход: `/dashboard.html`
+- Раздел **Посты** — добавление ленты/рилсов/отзывов.
+- Раздел **Воспоминания** — stories.
+- Раздел **Календарь** — управление слотами.
+
+> Поле **“Раздел ленты”** показывает, где пост появится на главной.
+
+---
+
+## 7) Типовые проблемы и как их чинить
+
+**Медиа не отправляются в Telegram**
+- Проверь лимиты PHP: `upload_max_filesize`, `post_max_size`.
+- Проверь, что PHP может писать во временную папку (`upload_tmp_dir`).
+
+**Слоты “дублируются”**
+- Убедись, что применена миграция `003_availability_route_tag.sql`.
+
+**API возвращает 500**
+- Включи логирование ошибок PHP в панели Beget или через `ini_set('display_errors', 1)`.
+
+---
+
+## 8) Чек-лист после деплоя
+
+1. Открывается `/` и нет горизонтального скролла на мобильном.
+2. Работает меню и карусель отзывов.
+3. Календарь показывает весь месяц, слоты выбираются.
+4. Отзыв с фото/видео приходит в Telegram.
+5. Фавикон отображается на всех страницах.
 
 ---
 

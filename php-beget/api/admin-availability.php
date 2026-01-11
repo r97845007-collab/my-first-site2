@@ -6,21 +6,17 @@ $isPublic = ($_GET['public'] ?? '') === '1';
 
 if ($method === 'GET') {
     if ($isPublic) {
-        $routeTag = trim((string)($_GET['route_tag'] ?? $_GET['route'] ?? ''));
         $date = trim((string)($_GET['date'] ?? ''));
         $params = [];
-        $conditions = ['is_available = 1'];
+        $conditions = [];
         if ($date !== '') {
             $conditions[] = 'date = ?';
             $params[] = $date;
         } else {
             $conditions[] = 'date >= CURDATE()';
         }
-        if ($routeTag !== '') {
-            $conditions[] = '(route_tag = ? OR route_tag IS NULL OR route_tag = "")';
-            $params[] = $routeTag;
-        }
-        $sql = 'SELECT id, date, time_slot, route_tag, is_available, time_slot AS time FROM availability WHERE ' . implode(' AND ', $conditions) . ' ORDER BY date ASC, time_slot ASC';
+        $whereSql = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+        $sql = 'SELECT id, date, time_slot, route_tag, is_available, time_slot AS time FROM availability ' . $whereSql . ' ORDER BY date ASC, time_slot ASC';
         $rows = db_query($sql, $params);
         sendJson(200, ['ok' => true, 'slots' => $rows]);
     }
@@ -60,7 +56,10 @@ if ($method === 'POST') {
             if (!$date || !$timeSlot) {
                 continue;
             }
-            $routeTag = $item['route_tag'] ?? null;
+            $routeTag = trim((string)($item['route_tag'] ?? ''));
+            if ($routeTag === '') {
+                $routeTag = 'all';
+            }
             $isAvailable = (int)($item['is_available'] ?? 1) ? 1 : 0;
             $stmt = $pdo->prepare(
                 'INSERT INTO availability (date, time_slot, route_tag, is_available) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE is_available = VALUES(is_available), route_tag = VALUES(route_tag)'

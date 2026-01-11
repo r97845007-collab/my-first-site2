@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Конная кавалерия">
+  <defs>
+    <linearGradient id="horse" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#7c3aed" />
+      <stop offset="1" stop-color="#22d3ee" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#horse)" />
+  <path
+    d="M22 42c6-1 11-6 13-12l7-2-4-6 6-2-4-4-8 4-8-3-6 7 3 5-5 5v8h6z"
+    fill="#fff"
+    opacity="0.95"
+  />
+  <circle cx="38" cy="23" r="2" fill="#0f172a" />
+</svg>

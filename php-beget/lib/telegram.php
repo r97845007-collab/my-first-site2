@@ -56,7 +56,7 @@ function telegram_send_media(string $type, string $filePath): ?string
     return $last['file_id'] ?? null;
 }
 
-function telegram_send_media_group(array $mediaFiles): ?string
+function telegram_send_media_group(array $mediaFiles, string $caption = ''): array
 {
     $payload = ['chat_id' => telegram_chat_id()];
     $files = [];
@@ -64,21 +64,31 @@ function telegram_send_media_group(array $mediaFiles): ?string
     foreach ($mediaFiles as $index => $item) {
         $attachKey = 'file' . $index;
         $files[$attachKey] = $item['path'];
-        $media[] = [
+        $entry = [
             'type' => $item['type'],
             'media' => 'attach://' . $attachKey,
         ];
+        if ($caption !== '' && $index === 0) {
+            $entry['caption'] = $caption;
+        }
+        $media[] = $entry;
     }
     $payload['media'] = json_encode($media);
     $res = telegram_request('sendMediaGroup', $payload, $files);
     if (empty($res['ok'])) {
-        return null;
+        return [];
     }
-    $first = $res['result'][0] ?? [];
-    if (isset($first['video']['file_id'])) {
-        return $first['video']['file_id'];
+    $ids = [];
+    foreach ($res['result'] as $item) {
+        if (isset($item['video']['file_id'])) {
+            $ids[] = $item['video']['file_id'];
+            continue;
+        }
+        $photos = $item['photo'] ?? [];
+        $last = end($photos);
+        if (!empty($last['file_id'])) {
+            $ids[] = $last['file_id'];
+        }
     }
-    $photos = $first['photo'] ?? [];
-    $last = end($photos);
-    return $last['file_id'] ?? null;
+    return $ids;
 }

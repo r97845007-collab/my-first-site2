@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Кабинет — Конная кавалерия</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/css/style.css" />
   </head>
   <body>
@@ -54,8 +55,20 @@
                 </select>
               </label>
               <label class="input">
-                <span>Маршрут (тег)</span>
-                <input name="routeTag" type="text" />
+                <span>Раздел ленты</span>
+                <select name="routeTag" required>
+                  <option value="all">Все</option>
+                  <option value="Новичкам">Новичкам</option>
+                  <option value="Закат">Закат</option>
+                  <option value="Семейные">Семейные</option>
+                  <option value="Долина">Долина</option>
+                  <option value="other">Другое…</option>
+                </select>
+                <small class="hint">Этот тег определяет, где пост появится на главной.</small>
+              </label>
+              <label class="input">
+                <span>Другое (вручную)</span>
+                <input name="routeTagCustom" type="text" placeholder="Например: Романтика" />
               </label>
               <label class="input">
                 <span>Длительность</span>
@@ -117,8 +130,20 @@
                 <input name="time" type="time" required />
               </label>
               <label class="input">
-                <span>Маршрут (опционально)</span>
-                <input name="routeTag" type="text" />
+                <span>Раздел слота</span>
+                <select name="routeTag" required>
+                  <option value="all">Все маршруты</option>
+                  <option value="Новичкам">Новичкам</option>
+                  <option value="Закат">Закат</option>
+                  <option value="Семейные">Семейные</option>
+                  <option value="Долина">Долина</option>
+                  <option value="other">Другое…</option>
+                </select>
+                <small class="hint">Если это общий слот, оставьте “Все маршруты”.</small>
+              </label>
+              <label class="input">
+                <span>Другое (вручную)</span>
+                <input name="routeTagCustom" type="text" placeholder="Например: Прогулка на рассвете" />
               </label>
               <label class="input">
                 <span>Доступно?</span>
