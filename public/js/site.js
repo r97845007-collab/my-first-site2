@@ -191,6 +191,11 @@ let activePostId = null;
 let postsData = [...posts];
 let storiesData = [...stories];
 let slotsData = [...slots];
+let feedCursor = null;
+let feedHasMore = true;
+let feedLoading = false;
+let feedFromApi = false;
+let feedSentinel = null;
 
 const saveState = () => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -214,7 +219,7 @@ const applyTheme = () => {
 };
 
 const fetchJson = async (url, options = {}) => {
-  const response = await fetch(url, options);
+  const response = await fetch(url, { credentials: "include", ...options });
   const contentType = response.headers.get("content-type") || "";
   const data = contentType.includes("application/json") ? await response.json() : {};
   if (!response.ok) {
@@ -242,6 +247,9 @@ const normalizePost = (post) => ({
   level: post.level || post.level_label || "",
   hashtags: parseHashtags(post.hashtags),
   dateCreated: post.dateCreated || post.created_at || new Date().toISOString(),
+  favorites_count: Number(post.favorites_count || 0),
+  comments_count: Number(post.comments_count || 0),
+  is_favorited: Boolean(post.is_favorited),
 });
 
 const normalizeSlot = (slot) => ({
@@ -298,6 +306,9 @@ const openStory = (story) => {
 };
 
 const getPopularityScore = (post) => {
+  if (feedFromApi) {
+    return (post.favorites_count || 0) + (post.comments_count || 0);
+  }
   const likeScore = state.likes[post.id] ? 1 : 0;
   const commentScore = (state.comments[post.id] || []).length;
   return likeScore + commentScore;
@@ -313,6 +324,9 @@ const matchesSearch = (post, query) => {
 };
 
 const filteredPosts = () => {
+  if (feedFromApi) {
+    return postsData;
+  }
   const query = elements.feedSearch.value.trim() || elements.globalSearch.value.trim();
   return postsData
     .filter((post) => (activeFilter === "all" ? true : post.routeTag === activeFilter))
@@ -327,19 +341,22 @@ const filteredPosts = () => {
 
 const renderPosts = () => {
   const list = filteredPosts();
-  const visible = list.slice(0, visibleCount);
+  const visible = feedFromApi ? list : list.slice(0, visibleCount);
   elements.feedGrid.innerHTML = "";
   visible.forEach((post) => elements.feedGrid.appendChild(createPostCard(post)));
-  elements.showMore.hidden = visible.length >= list.length;
+  if (feedFromApi && feedSentinel) {
+    elements.feedGrid.appendChild(feedSentinel);
+  }
+  elements.showMore.hidden = feedFromApi ? !feedHasMore : visible.length >= list.length;
 };
 
 const createPostCard = (post) => {
   const card = document.createElement("article");
   card.className = "post-card";
   card.id = `post-${post.id}`;
-  const liked = Boolean(state.likes[post.id]);
+  const liked = feedFromApi ? Boolean(post.is_favorited) : Boolean(state.likes[post.id]);
   const saved = Boolean(state.saves[post.id]);
-  const commentsCount = (state.comments[post.id] || []).length;
+  const commentsCount = feedFromApi ? post.comments_count || 0 : (state.comments[post.id] || []).length;
   const mediaKind = post.media_kind === "video" || post.media_kind === "telegram_video" ? "video" : "photo";
   const mediaUrl = post.media_url || "";
   const fallbackSrc = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
@@ -372,7 +389,7 @@ const createPostCard = (post) => {
       <div class="post-actions">
       <div>
         <button class="icon-btn ${liked ? "is-active" : ""}" data-action="like" aria-pressed="${liked}">
-          ❤️ ${liked ? "Лайк" : "Лайк"}
+          ❤️ ${feedFromApi ? post.favorites_count || 0 : liked ? "Лайк" : "Лайк"}
         </button>
         <button class="icon-btn ${saved ? "is-active" : ""}" data-action="save" aria-pressed="${saved}">
           🔖 Сохранить
@@ -401,9 +418,25 @@ const createPostCard = (post) => {
 
 const handlePostAction = async (post, action) => {
   if (action === "like") {
-    state.likes[post.id] = !state.likes[post.id];
-    saveState();
-    renderPosts();
+    if (!feedFromApi) {
+      state.likes[post.id] = !state.likes[post.id];
+      saveState();
+      renderPosts();
+      return;
+    }
+    try {
+      const nextState = !post.is_favorited;
+      await fetchJson("/api/favorite.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ post_id: post.id, state: nextState }),
+      });
+      post.is_favorited = nextState;
+      post.favorites_count = Math.max(0, (post.favorites_count || 0) + (nextState ? 1 : -1));
+      renderPosts();
+    } catch (error) {
+      alert(error.message || "Нужна авторизация для лайка.");
+    }
   }
   if (action === "save") {
     state.saves[post.id] = !state.saves[post.id];
@@ -424,8 +457,16 @@ const handlePostAction = async (post, action) => {
   }
 };
 
-const openComments = (postId) => {
+const openComments = async (postId) => {
   activePostId = postId;
+  if (feedFromApi) {
+    try {
+      const response = await fetchJson(`/api/comments.php?post_id=${postId}`);
+      state.comments[postId] = response.items || [];
+    } catch (error) {
+      state.comments[postId] = state.comments[postId] || [];
+    }
+  }
   renderComments();
   elements.commentModal.showModal();
 };
@@ -436,9 +477,9 @@ const renderComments = () => {
     .map(
       (comment) => `
       <div class="comment-item">
-        <strong>${comment.name}</strong>
-        <p>${comment.text}</p>
-        <small>${comment.date}</small>
+        <strong>${comment.user?.email || comment.name || "Гость"}</strong>
+        <p>${comment.body || comment.text}</p>
+        <small>${comment.created_at || comment.date || ""}</small>
       </div>
     `
     )
@@ -562,8 +603,12 @@ const setupFilters = () => {
     chip.addEventListener("click", () => {
       activeFilter = chip.dataset.filter === "all" ? "all" : chip.dataset.filter;
       setActiveChip(chip);
-      visibleCount = 6;
-      renderPosts();
+      if (feedFromApi) {
+        loadFeedFromApi(true).catch(() => {});
+      } else {
+        visibleCount = 6;
+        renderPosts();
+      }
       scrollToFeed();
     });
   });
@@ -572,24 +617,56 @@ const setupFilters = () => {
 
 const setupSearch = () => {
   elements.feedSearch.addEventListener("input", () => {
-    visibleCount = 6;
-    renderPosts();
+    if (feedFromApi) {
+      loadFeedFromApi(true).catch(() => {});
+    } else {
+      visibleCount = 6;
+      renderPosts();
+    }
   });
   elements.globalSearch.addEventListener("input", () => {
-    visibleCount = 6;
-    renderPosts();
+    if (feedFromApi) {
+      loadFeedFromApi(true).catch(() => {});
+    } else {
+      visibleCount = 6;
+      renderPosts();
+    }
   });
 };
 
 const setupSorting = () => {
-  elements.sortSelect.addEventListener("change", renderPosts);
+  elements.sortSelect.addEventListener("change", () => {
+    if (feedFromApi) {
+      loadFeedFromApi(true).catch(() => {});
+    } else {
+      renderPosts();
+    }
+  });
 };
 
 const setupShowMore = () => {
   elements.showMore.addEventListener("click", () => {
-    visibleCount += 4;
-    renderPosts();
+    if (feedFromApi) {
+      loadFeedFromApi(false).catch(() => {});
+    } else {
+      visibleCount += 4;
+      renderPosts();
+    }
   });
+};
+
+const setupInfiniteScroll = () => {
+  feedSentinel = document.createElement("div");
+  feedSentinel.dataset.feedSentinel = "true";
+  elements.feedGrid.appendChild(feedSentinel);
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting && feedFromApi) {
+        loadFeedFromApi(false).catch(() => {});
+      }
+    });
+  });
+  observer.observe(feedSentinel);
 };
 
 const setupModals = () => {
@@ -608,19 +685,47 @@ const setupModals = () => {
 };
 
 const setupComments = () => {
-  elements.commentForm.addEventListener("submit", (event) => {
+  elements.commentForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const formData = new FormData(elements.commentForm);
     const name = formData.get("comment-name").trim();
     const text = formData.get("comment-text").trim();
-    if (name.length < 2 || text.length < 2) return;
-    const list = state.comments[activePostId] || [];
-    list.push({ name, text, date: new Date().toLocaleDateString("ru-RU") });
-    state.comments[activePostId] = list;
-    saveState();
-    elements.commentForm.reset();
-    renderComments();
-    renderPosts();
+    if (text.length < 1) return;
+
+    if (!feedFromApi) {
+      if (name.length < 2 || text.length < 2) return;
+      const list = state.comments[activePostId] || [];
+      list.push({ name, text, date: new Date().toLocaleDateString("ru-RU") });
+      state.comments[activePostId] = list;
+      saveState();
+      elements.commentForm.reset();
+      renderComments();
+      renderPosts();
+      return;
+    }
+
+    try {
+      const payload = { post_id: activePostId, body: text };
+      const response = await fetchJson("/api/comments.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const list = state.comments[activePostId] || [];
+      if (response.comment) {
+        list.unshift(response.comment);
+      }
+      state.comments[activePostId] = list;
+      const post = postsData.find((item) => item.id === activePostId);
+      if (post) {
+        post.comments_count = (post.comments_count || 0) + 1;
+      }
+      elements.commentForm.reset();
+      renderComments();
+      renderPosts();
+    } catch (error) {
+      alert(error.message || "Нужна авторизация для комментариев.");
+    }
   });
 };
 
@@ -816,18 +921,53 @@ const setupReviewForm = () => {
   });
 };
 
+const loadStoriesFromApi = async () => {
+  const response = await fetchJson("/api/stories.php?limit=20");
+  storiesData = response.items || storiesData;
+};
+
+const loadFeedFromApi = async (reset = false) => {
+  if (feedLoading || (!feedHasMore && !reset)) return;
+  feedLoading = true;
+  try {
+    if (reset) {
+      feedCursor = null;
+      feedHasMore = true;
+      postsData = [];
+    }
+    const params = new URLSearchParams();
+    params.set("limit", "6");
+    const query = elements.feedSearch.value.trim() || elements.globalSearch.value.trim();
+    if (query) params.set("q", query);
+    if (activeFilter !== "all") params.set("tag", activeFilter);
+    params.set("sort", elements.sortSelect.value || "new");
+    if (feedCursor) params.set("cursor", feedCursor);
+
+    const response = await fetchJson(`/api/feed.php?${params.toString()}`);
+    const items = (response.items || []).map(normalizePost);
+    postsData = reset ? items : [...postsData, ...items];
+    feedCursor = response.next_cursor || null;
+    feedHasMore = Boolean(feedCursor);
+    feedFromApi = true;
+    elements.feedStatus.textContent = "";
+    renderPosts();
+  } finally {
+    feedLoading = false;
+  }
+};
+
 const loadPublicData = async () => {
   try {
-    const postsResponse = await fetchJson("/api/admin-posts.php?public=1");
-    postsData = (postsResponse.posts || postsData).map(normalizePost);
-    elements.feedStatus.textContent = "";
+    await loadFeedFromApi(true);
   } catch (error) {
+    feedFromApi = false;
     elements.feedStatus.textContent = "Показываем демо-ленту: сервер недоступен.";
+    postsData = posts.map(normalizePost);
+    renderPosts();
   }
 
   try {
-    const storiesResponse = await fetchJson("/api/admin-stories.php?public=1");
-    storiesData = storiesResponse.stories || storiesData;
+    await loadStoriesFromApi();
   } catch (error) {
     // fallback
   }
@@ -858,6 +998,7 @@ const init = async () => {
   setupSearch();
   setupSorting();
   setupShowMore();
+  setupInfiniteScroll();
   setupModals();
   setupComments();
   setupThemeToggle();

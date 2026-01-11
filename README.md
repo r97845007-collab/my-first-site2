@@ -80,7 +80,9 @@ deploy/beget/db/schema.sql
 1. Откройте phpMyAdmin в панели Beget.
 2. Создайте базу данных.
 3. Импортируйте файл `deploy/beget/db/schema.sql`.
-4. Если база уже создана ранее, примените миграцию `deploy/beget/db/migrations/001_user_telegram.sql`.
+4. Если база уже создана ранее, примените миграции:
+   - `deploy/beget/db/migrations/001_user_telegram.sql`
+   - `deploy/beget/db/migrations/002_social.sql`
 
 ---
 
@@ -117,9 +119,14 @@ deploy/beget/db/schema.sql
 6. Откройте `media_url` → должен отдать `image/*` или `video/*` и заголовок `X-Media-Proxy: 1`.
 7. Админка показывает превью медиа в списке постов/воспоминаний.
 8. Главная лента показывает медиа (фото/видео).
-9. `POST /api/telegram-save-token.php` → `{ ok:true }`, затем `GET /api/telegram-status.php` → `telegram` из `getMe`.
-10. `POST /api/admin-availability.php` → создаёт слот, выбор маршрута на сайте подтягивает слоты.
-11. `POST /api/lead-send.php` → заявка приходит владельцу в Telegram.
+9. `GET /api/feed.php?limit=6` → возвращает ленту с `favorites_count` и `comments_count`.
+10. `GET /api/stories.php?limit=20` → возвращает воспоминания.
+11. `POST /api/comments.php` → комментарий сохраняется и виден в `GET /api/comments.php?post_id=...`.
+12. `POST /api/favorite.php` → лайк/снятие лайка обновляет счётчики.
+13. `POST /api/telegram-save-token.php` → `{ ok:true }`, затем `GET /api/telegram-status.php` → `telegram` из `getMe`.
+14. `POST /api/admin-availability.php` → создаёт слот, выбор маршрута на сайте подтягивает слоты.
+15. `POST /api/admin-availability-generate.php` → генерирует слоты по диапазону.
+16. `POST /api/lead-send.php` → заявка приходит владельцу в Telegram.
 
 ---
 
