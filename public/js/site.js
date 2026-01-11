@@ -232,11 +232,15 @@ const fetchJson = async (url, options = {}) => {
 const parseHashtags = (value) => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
+  const splitHashtags = (input) =>
+    String(input)
+      .split(/[\s,]+/)
+      .filter(Boolean);
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : String(value).split(" ");
+    return Array.isArray(parsed) ? parsed : splitHashtags(value);
   } catch (error) {
-    return String(value).split(" ");
+    return splitHashtags(value);
   }
 };
 
