@@ -1,0 +1,88 @@
+CREATE TABLE users (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(190) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('admin') NOT NULL DEFAULT 'admin',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE media (
+  id VARCHAR(40) PRIMARY KEY,
+  telegram_file_id VARCHAR(255) NOT NULL,
+  kind ENUM('photo','video') NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE posts (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  type ENUM('post','memory','funnel') NOT NULL,
+  title VARCHAR(190) NULL,
+  body TEXT NOT NULL,
+  route_tag VARCHAR(64) NULL,
+  duration_label VARCHAR(32) NULL,
+  level_label VARCHAR(32) NULL,
+  hashtags TEXT NULL,
+  funnel_stage ENUM('idea','work','done') NULL,
+  media_id VARCHAR(40) NULL,
+  is_published TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE SET NULL
+);
+
+CREATE TABLE reviews (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NULL,
+  rating TINYINT UNSIGNED NULL,
+  text TEXT NOT NULL,
+  status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE review_media (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  review_id BIGINT UNSIGNED NOT NULL,
+  media_id VARCHAR(40) NOT NULL,
+  FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+  FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
+);
+
+CREATE TABLE availability (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  date DATE NOT NULL,
+  time_slot VARCHAR(16) NOT NULL,
+  route_tag VARCHAR(64) NOT NULL DEFAULT 'all',
+  is_available TINYINT(1) NOT NULL DEFAULT 1,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_slot (date, time_slot, route_tag)
+);
+
+CREATE TABLE user_telegram (
+  user_id BIGINT UNSIGNED PRIMARY KEY,
+  bot_token_enc TEXT NOT NULL,
+  bot_token_iv VARCHAR(64) NOT NULL,
+  bot_token_tag VARCHAR(64) NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE comments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT UNSIGNED NOT NULL,
+  user_id BIGINT UNSIGNED NULL,
+  body TEXT NOT NULL,
+  is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_comments_post_created (post_id, created_at),
+  FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE favorites (
+  user_id BIGINT UNSIGNED NOT NULL,
+  post_id BIGINT UNSIGNED NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, post_id),
+  INDEX idx_favorites_post (post_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+);

@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+.env
+.env.local
+php-beget/config.local.php
+php-beget/api/config.local.php
+php-beget/tools/.admin_created
+
+public/api/config.local.php
+
+deploy/beget/public_html/api/config.local.php

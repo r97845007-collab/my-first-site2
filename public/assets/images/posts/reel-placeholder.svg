@@ -1,0 +1,16 @@
+<svg width="700" height="1000" viewBox="0 0 700 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="reel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0F172A" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#7C3AED" stop-opacity="0.6" />
+    </linearGradient>
+  </defs>
+  <rect width="700" height="1000" rx="48" fill="url(#reel)" />
+  <rect x="80" y="740" width="540" height="20" rx="10" fill="#FFFFFF" fill-opacity="0.3" />
+  <rect x="80" y="740" width="280" height="20" rx="10" fill="#FFFFFF" fill-opacity="0.7" />
+  <circle cx="350" cy="420" r="120" fill="#FFFFFF" fill-opacity="0.2" />
+  <polygon points="320,360 460,420 320,480" fill="#FFFFFF" />
+  <text x="350" y="620" fill="#FFFFFF" font-size="32" text-anchor="middle" font-family="Segoe UI, sans-serif">
+    Видео будет добавлено позже
+  </text>
+</svg>

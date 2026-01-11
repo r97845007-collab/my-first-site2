@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Регистрация — Конная кавалерия</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <main class="auth-page">
+      <div class="auth-card">
+        <h1>Регистрация</h1>
+        <p class="hint">Создайте доступ к личному кабинету и админке.</p>
+        <form id="register-form" class="form-grid" novalidate>
+          <label class="input input--full">
+            <span>Email</span>
+            <input type="email" name="email" required />
+          </label>
+          <label class="input input--full">
+            <span>Пароль (минимум 8 символов)</span>
+            <input type="password" name="password" minlength="8" required />
+          </label>
+          <label class="input input--full">
+            <span>Повторите пароль</span>
+            <input type="password" name="confirm" minlength="8" required />
+          </label>
+          <div class="alert" role="alert" id="register-error" hidden></div>
+          <button class="btn" type="submit">Создать аккаунт</button>
+        </form>
+        <p class="hint">
+          Уже есть аккаунт? <a href="/login">Войти</a>
+        </p>
+      </div>
+    </main>
+    <script src="/js/auth.js" defer></script>
+  </body>
+</html>

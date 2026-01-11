@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Конная кавалерия — конные прогулки в Геленджике</title>
+    <meta
+      name="description"
+      content="Конные прогулки в Геленджике от клуба “Конная кавалерия”: маршруты, расписание, отзывы и онлайн-заявка в Telegram."
+    />
+    <meta property="og:title" content="Конная кавалерия — конные прогулки в Геленджике" />
+    <meta
+      property="og:description"
+      content="Лента маршрутов, stories, отзывы и быстрая заявка в Telegram."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://example.com" />
+    <meta property="og:image" content="https://example.com/placeholder-og.jpg" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css"
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": "Конная кавалерия",
+        "areaServed": "Геленджик",
+        "telephone": "+79883415048",
+        "url": "https://example.com"
+      }
+    </script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar" id="top">
+        <div class="topbar__logo" aria-label="Конная кавалерия">
+          <span class="logo-mark" aria-hidden="true">⟡</span>
+          <span class="logo-text">Конная кавалерия</span>
+        </div>
+        <label class="search" aria-label="Поиск по ленте">
+          <span class="search__icon" aria-hidden="true">🔍</span>
+          <input id="global-search" type="search" placeholder="Поиск маршрутов" />
+        </label>
+        <div class="topbar__actions">
+          <button class="btn btn--ghost" id="theme-toggle" type="button" aria-pressed="false">
+            <span class="btn__icon" aria-hidden="true">🌓</span>
+            Тема
+          </button>
+          <button class="btn btn--ghost" id="open-review" type="button">
+            Оставить отзыв
+          </button>
+          <a class="btn topbar__cta" href="#funnel">Записаться</a>
+          <a class="topbar__call" href="tel:+79883415048" aria-label="Позвонить">📞</a>
+          <button class="btn btn--ghost" id="menu-toggle" type="button" aria-expanded="false">
+            <span class="btn__icon" aria-hidden="true">☰</span>
+            Меню
+          </button>
+        </div>
+      </header>
+
+      <div class="menu-overlay" id="menu-overlay" aria-hidden="true"></div>
+      <nav class="mobile-menu" id="mobile-menu" aria-label="Навигация">
+        <div class="mobile-menu__header">
+          <span class="mobile-menu__title">Меню</span>
+          <button class="btn btn--ghost" id="menu-close" type="button">Закрыть</button>
+        </div>
+        <a href="#feed">Лента</a>
+        <a href="#routes">Маршруты</a>
+        <a href="#calendar">Календарь</a>
+        <a href="#reviews">Отзывы</a>
+        <a href="#contacts">Контакты</a>
+        <button class="btn btn--ghost" id="favorites-open" type="button">Избранное</button>
+      </nav>
+
+      <main>
+        <section class="stories" aria-label="Воспоминания">
+          <div class="section-header">
+            <h2>Воспоминания</h2>
+            <p class="hint">Свежие моменты с прогулок — листайте и вдохновляйтесь.</p>
+          </div>
+          <div class="stories__list" id="stories-list" role="list"></div>
+        </section>
+
+        <section class="feed" id="feed" aria-label="Лента">
+          <div class="section-header">
+            <h2>Лента</h2>
+            <div class="filters" role="group" aria-label="Фильтры ленты">
+              <button class="chip" data-filter="all" type="button">Все</button>
+              <button class="chip" data-filter="Новичкам" type="button">Новичкам</button>
+              <button class="chip" data-filter="Закат" type="button">Закат</button>
+              <button class="chip" data-filter="Семейный" type="button">Семейные</button>
+              <button class="chip" data-filter="Долина" type="button">Долина</button>
+            </div>
+          </div>
+          <div class="feed__controls">
+            <label class="input">
+              <span>Поиск</span>
+              <input id="feed-search" type="search" placeholder="Поиск по описанию или #" />
+            </label>
+            <label class="input">
+              <span>Сортировка</span>
+              <select id="sort-select">
+                <option value="popular">Популярные</option>
+                <option value="new">Новые</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint" id="feed-status" role="status"></p>
+          <div class="feed__grid" id="feed-grid"></div>
+          <button class="btn btn--outline" id="show-more" type="button">Показать ещё</button>
+        </section>
+
+        <section class="routes" id="routes" aria-label="Маршруты и цены">
+          <div class="section-header">
+            <h2>Маршруты и цены</h2>
+            <p class="hint">Цены заполняются вручную — обновления будут в ленте.</p>
+          </div>
+          <details class="price-spoiler">
+            <summary>Маршрут “Закат над бухтой”</summary>
+            <p>Панорамная прогулка вдоль побережья с мягким маршрутом и фотостопами.</p>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Услуга</th>
+                    <th>Длительность</th>
+                    <th>Цена</th>
+                    <th>Что включено</th>
+                    <th>Примечания</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>—</td>
+                    <td>1 час</td>
+                    <td>заполню позже</td>
+                    <td>—</td>
+                    <td>—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <details class="price-spoiler">
+            <summary>Маршрут “Долина впечатлений”</summary>
+            <p>Маршрут через тенистые тропы и видовые точки для спокойных поездок.</p>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Услуга</th>
+                    <th>Длительность</th>
+                    <th>Цена</th>
+                    <th>Что включено</th>
+                    <th>Примечания</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>—</td>
+                    <td>2 часа</td>
+                    <td>заполню позже</td>
+                    <td>—</td>
+                    <td>—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+          <details class="price-spoiler">
+            <summary>Маршрут “Смотровой гребень”</summary>
+            <p>Фотогеничный маршрут с набором высоты и панорамой на Геленджик.</p>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Услуга</th>
+                    <th>Длительность</th>
+                    <th>Цена</th>
+                    <th>Что включено</th>
+                    <th>Примечания</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>—</td>
+                    <td>3 часа</td>
+                    <td>заполню позже</td>
+                    <td>—</td>
+                    <td>—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+
+        <section class="calendar" id="calendar" aria-label="Календарь и слоты">
+          <div class="section-header">
+            <h2>Календарь и слоты</h2>
+            <p class="hint">Выберите удобный слот для прогулки — данные синхронизируются с заявкой.</p>
+          </div>
+          <div class="calendar-ui">
+            <div class="calendar-header">
+              <button class="btn btn--ghost" id="calendar-prev" type="button">←</button>
+              <h3 id="calendar-month"></h3>
+              <button class="btn btn--ghost" id="calendar-next" type="button">→</button>
+            </div>
+            <div class="calendar-grid" id="calendar-grid"></div>
+          </div>
+          <div class="calendar-day" id="calendar-day">
+            <h3 id="calendar-day-title">Выберите дату</h3>
+            <div class="slot-grid" id="calendar-slots"></div>
+          </div>
+        </section>
+
+        <section class="funnel" id="funnel" aria-label="Воронка записи">
+          <div class="section-header">
+            <h2>Запись на прогулку</h2>
+            <p class="hint">3 шага до брони — выбираем маршрут, слот и оставляем контакты.</p>
+          </div>
+          <div class="wizard" aria-live="polite">
+            <div class="wizard__steps">
+              <button class="step-indicator" data-step="1" type="button">1. Маршрут</button>
+              <button class="step-indicator" data-step="2" type="button">2. Дата</button>
+              <button class="step-indicator" data-step="3" type="button">3. Контакты</button>
+            </div>
+
+            <div class="wizard__panel" data-step-panel="1">
+              <h3>Выберите маршрут</h3>
+              <div class="route-grid" id="route-grid"></div>
+              <div class="wizard__nav">
+                <button class="btn" data-next type="button">Дальше</button>
+              </div>
+            </div>
+
+            <div class="wizard__panel" data-step-panel="2" hidden>
+              <h3>Выберите дату и время</h3>
+              <div class="slot-grid" id="slot-grid"></div>
+              <div class="wizard__nav">
+                <button class="btn btn--ghost" data-prev type="button">Назад</button>
+                <button class="btn" data-next type="button">Дальше</button>
+              </div>
+            </div>
+
+            <div class="wizard__panel" data-step-panel="3" hidden>
+              <h3>Контакты</h3>
+              <form id="booking-form" novalidate>
+                <div class="form-grid">
+                  <label class="input">
+                    <span>Имя*</span>
+                    <input type="text" name="name" required minlength="2" />
+                    <small class="field-error" data-error-for="name"></small>
+                  </label>
+                  <label class="input">
+                    <span>Телефон*</span>
+                    <input type="tel" name="phone" inputmode="tel" placeholder="+7 (___) ___-__-__" required />
+                    <small class="field-error" data-error-for="phone"></small>
+                  </label>
+                  <label class="input">
+                    <span>Кол-во человек</span>
+                    <input type="number" name="people" min="1" max="6" value="1" />
+                  </label>
+                  <label class="input">
+                    <span>Уровень</span>
+                    <select name="level">
+                      <option value="Новичок">Новичок</option>
+                      <option value="Средний">Средний</option>
+                    </select>
+                  </label>
+                  <label class="input input--full">
+                    <span>Комментарий</span>
+                    <textarea name="comment" rows="3" placeholder="Пожелания или вопросы"></textarea>
+                  </label>
+                </div>
+                <div class="alert" role="alert" id="form-alert" hidden></div>
+                <div class="wizard__nav">
+                  <button class="btn btn--ghost" data-prev type="button">Назад</button>
+                  <button class="btn" type="submit">Отправить заявку в Telegram</button>
+                </div>
+                <p class="hint" id="telegram-status"></p>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="reviews" id="reviews" aria-label="Отзывы">
+          <div class="section-header">
+            <h2>Отзывы</h2>
+            <p class="hint">Отзывы гостей — как посты, чтобы легко листать и делиться.</p>
+          </div>
+          <div class="review-cta">
+            <p>Поделитесь впечатлениями — добавьте фото или видео после прогулки.</p>
+            <button class="btn" id="review-cta" type="button">Оставить отзыв</button>
+          </div>
+          <div class="review-grid review-grid--fallback" id="review-grid"></div>
+        </section>
+
+        <section class="faq" id="faq" aria-label="Вопросы и ответы">
+          <div class="section-header">
+            <h2>FAQ</h2>
+          </div>
+          <details>
+            <summary>Нужен ли опыт верховой езды?</summary>
+            <p>Нет, маршруты подходят новичкам. Перед стартом проводим инструктаж.</p>
+          </details>
+          <details>
+            <summary>Что надеть на прогулку?</summary>
+            <p>Удобная обувь, закрытая одежда по погоде, солнцезащитные очки летом.</p>
+          </details>
+          <details>
+            <summary>Можно ли с детьми?</summary>
+            <p>Да, есть семейные маршруты. Уточните возраст при заявке.</p>
+          </details>
+        </section>
+
+        <section class="contacts" id="contacts" aria-label="Контакты">
+          <div class="section-header">
+            <h2>Контакты</h2>
+          </div>
+          <div class="contact-grid">
+            <div class="contact-card">
+              <h3>Связь</h3>
+              <p>
+                Телефон:
+                <a href="tel:+79883415048">+7 (988) 341-50-48</a>
+              </p>
+              <div class="contact-actions">
+                <a class="btn" href="tel:+79883415048">Позвонить</a>
+                <a
+                  class="btn btn--ghost"
+                  href="https://yandex.ru/maps/org/konnaya_kavaleriya/181659825778/?ll=38.164409%2C44.545723&z=17"
+                  target="_blank"
+                  rel="noopener"
+                  >Открыть в Яндекс Картах</a
+                >
+              </div>
+              <p class="hint">Работаем ежедневно, отвечаем в течение 15 минут.</p>
+            </div>
+            <div class="contact-card">
+              <h3>Карта</h3>
+              <div class="map-embed">
+                <a
+                  href="https://yandex.ru/maps/org/konnaya_kavaleriya/181659825778/?utm_medium=mapframe&utm_source=maps"
+                  >Конная Кавалерия</a
+                >
+                <a
+                  href="https://yandex.ru/maps/10995/krasnodar-krai/category/horse_riding/184107287/?utm_medium=mapframe&utm_source=maps"
+                  >Конный клуб в Краснодарском крае</a
+                >
+                <iframe
+                  src="https://yandex.ru/map-widget/v1/org/konnaya_kavaleriya/181659825778/?ll=38.164151%2C44.546366&z=17"
+                  width="560"
+                  height="400"
+                  frameborder="1"
+                  allowfullscreen="true"
+                  title="Карта Конная кавалерия"
+                  loading="lazy"
+                ></iframe>
+              </div>
+            </div>
+            <div class="contact-card">
+              <h3>Как добраться</h3>
+              <p>
+                Удобный подъезд со стороны набережной, парковка рядом. После бронирования
+                отправим точный ориентир и маршрут.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div>
+          <strong>Конная кавалерия</strong>
+          <p>Конные прогулки в Геленджике</p>
+        </div>
+        <div class="footer__links">
+          <a href="#feed">Лента</a>
+          <a href="#routes">Маршруты</a>
+          <a href="#funnel">Запись</a>
+          <a href="#contacts">Контакты</a>
+        </div>
+      </footer>
+
+      <nav class="tabbar" aria-label="Нижняя панель">
+        <a href="#feed">Лента</a>
+        <a href="#routes">Маршруты</a>
+        <a href="#calendar">Календарь</a>
+        <a href="#reviews">Отзывы</a>
+        <a href="#contacts">Контакты</a>
+      </nav>
+    </div>
+
+    <dialog class="modal" id="story-modal" aria-label="Воспоминание">
+      <div class="modal__content">
+        <button class="btn btn--ghost" data-close type="button">Закрыть</button>
+        <div class="story-content" id="story-content"></div>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="comment-modal" aria-label="Комментарии">
+      <div class="modal__content">
+        <button class="btn btn--ghost" data-close type="button">Закрыть</button>
+        <div class="comment-body">
+          <h3>Комментарии</h3>
+          <div id="comment-list"></div>
+          <form id="comment-form" class="comment-form">
+            <label class="input">
+              <span>Имя</span>
+              <input name="comment-name" type="text" required minlength="2" />
+            </label>
+            <label class="input">
+              <span>Комментарий</span>
+              <textarea name="comment-text" rows="3" required></textarea>
+            </label>
+            <button class="btn" type="submit">Отправить</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="review-modal" aria-label="Оставить отзыв">
+      <div class="modal__content">
+        <button class="btn btn--ghost" data-close type="button">Закрыть</button>
+        <h3>Оставить отзыв</h3>
+        <p class="hint">Ваш отзыв помогает другим выбрать маршрут. Можно приложить фото или видео.</p>
+        <form id="review-form" class="review-form" novalidate>
+          <div class="form-grid">
+            <label class="input">
+              <span>Имя</span>
+              <input type="text" name="review-name" placeholder="Как к вам обращаться?" />
+            </label>
+            <label class="input">
+              <span>Оценка</span>
+              <select name="review-rating">
+                <option value="">Без оценки</option>
+                <option value="5">5 — отлично</option>
+                <option value="4">4 — хорошо</option>
+                <option value="3">3 — нормально</option>
+                <option value="2">2 — есть вопросы</option>
+                <option value="1">1 — плохо</option>
+              </select>
+            </label>
+            <label class="input input--full">
+              <span>Отзыв*</span>
+              <textarea name="review-text" rows="4" minlength="10" required></textarea>
+              <small class="field-error" data-error-for="review-text"></small>
+            </label>
+            <label class="input input--full">
+              <span>Фото или видео (до 5 файлов)</span>
+              <input id="review-files" type="file" name="review-files" accept="image/*,video/*" multiple />
+              <small class="hint">Файлы отправляются в Telegram владельцу, без сохранения в Git.</small>
+            </label>
+          </div>
+          <div class="file-preview" id="review-preview"></div>
+          <div class="alert" role="alert" id="review-alert" hidden></div>
+          <div class="wizard__nav">
+            <button class="btn" type="submit">Отправить отзыв</button>
+          </div>
+          <p class="hint" id="review-status"></p>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="favorites-modal" aria-label="Избранное">
+      <div class="modal__content">
+        <button class="btn btn--ghost" data-close type="button">Закрыть</button>
+        <h3>Избранное</h3>
+        <p class="hint">Ваши сохранённые маршруты хранятся на этом устройстве.</p>
+        <div id="favorites-list" class="feed__grid"></div>
+        <p class="hint" id="favorites-empty">Пока нет сохранённых постов.</p>
+      </div>
+    </dialog>
+
+    <dialog class="reel-viewer" id="reel-viewer" aria-label="Просмотр рилсов">
+      <div class="reel-viewer__content">
+        <button class="btn btn--ghost reel-viewer__close" id="reel-close" type="button">Закрыть</button>
+        <div class="reel-track" id="reel-track"></div>
+      </div>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
+    <script src="/js/site.js" defer></script>
+  </body>
+</html>
