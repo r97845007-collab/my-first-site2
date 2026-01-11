@@ -75,11 +75,15 @@
 
       <main>
         <section class="stories" aria-label="Воспоминания">
-          <div class="section-header">
-            <h2>Воспоминания</h2>
-            <p class="hint">Свежие моменты с прогулок — листайте и вдохновляйтесь.</p>
+          <div class="container">
+            <div class="stories__header">
+              <h2>Воспоминания</h2>
+              <p class="hint">Свежие моменты с прогулок — листайте и вдохновляйтесь.</p>
+            </div>
+            <div class="stories__slider" id="stories-slider">
+              <div class="stories__list stories__list--fallback" id="stories-list" role="list"></div>
+            </div>
           </div>
-          <div class="stories__list" id="stories-list" role="list"></div>
         </section>
 
         <section class="feed" id="feed" aria-label="Лента">

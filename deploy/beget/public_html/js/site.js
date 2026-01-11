@@ -303,13 +303,13 @@ const renderStories = () => {
     const subtitle = story.subtitle || story.text || "Свежий момент";
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "story-card";
+    card.className = "story-card stories__item";
+    card.dataset.storyId = story.id;
     card.innerHTML = `
       <img class="story-avatar" src="${ASSETS.story}" alt="Воспоминание ${story.title}" loading="lazy" />
       <div>${story.title}</div>
       <small class="hint">${subtitle}</small>
     `;
-    card.addEventListener("click", () => openStory(story));
     elements.storiesList.appendChild(card);
   });
   initStoriesCarousel();
@@ -336,7 +336,7 @@ const openStory = (story) => {
       img.src = ASSETS.photo;
     });
   }
-  elements.storyModal.showModal();
+  openDialog(elements.storyModal);
 };
 
 const getPopularityScore = (post) => {
@@ -1000,18 +1000,70 @@ const setupModals = () => {
 
 const initStoriesCarousel = () => {
   if (!elements.storiesList) return;
-  if (!window.jQuery || !window.jQuery.fn?.slick) return;
+  if (!window.jQuery || !window.jQuery.fn?.slick) {
+    elements.storiesList.classList.add("stories__list--fallback");
+    return;
+  }
   const $list = window.jQuery(elements.storiesList);
   if ($list.hasClass("slick-initialized")) {
     $list.slick("unslick");
   }
+  elements.storiesList.classList.remove("stories__list--fallback");
   const showArrows = !window.matchMedia("(max-width: 768px)").matches;
   $list.slick({
     centerMode: true,
-    variableWidth: true,
+    variableWidth: false,
     infinite: true,
     arrows: showArrows,
     swipe: true,
+    touchMove: true,
+    slidesToShow: 3,
+    adaptiveHeight: false,
+    responsive: [
+      {
+        breakpoint: 1024,
+        settings: { slidesToShow: 3 },
+      },
+      {
+        breakpoint: 768,
+        settings: { slidesToShow: 1, arrows: false },
+      },
+    ],
+  });
+  applyStories3DClasses();
+  $list.on("afterChange", () => {
+    applyStories3DClasses();
+  });
+};
+
+const applyStories3DClasses = () => {
+  const slides = Array.from(elements.storiesList.querySelectorAll(".slick-slide"));
+  if (!slides.length) return;
+  slides.forEach((slide) => {
+    slide.classList.remove("is-current", "is-prev", "is-next", "is-prev2", "is-next2");
+  });
+  const current = slides.find((slide) => slide.classList.contains("slick-center")) || slides[0];
+  const currentIndex = slides.indexOf(current);
+  const mark = (offset, className) => {
+    const target = slides[currentIndex + offset];
+    if (target) target.classList.add(className);
+  };
+  current.classList.add("is-current");
+  mark(-1, "is-prev");
+  mark(1, "is-next");
+  mark(-2, "is-prev2");
+  mark(2, "is-next2");
+};
+
+const setupStoriesInteractions = () => {
+  document.addEventListener("click", (event) => {
+    const card = event.target.closest(".stories__item");
+    if (!card) return;
+    const storyId = card.dataset.storyId;
+    const story = storiesData.find((item) => String(item.id) === String(storyId));
+    if (story) {
+      openStory(story);
+    }
   });
 };
 
@@ -1426,6 +1478,7 @@ const init = async () => {
   setupShowMore();
   setupInfiniteScroll();
   setupModals();
+  setupStoriesInteractions();
   setupComments();
   setupThemeToggle();
   setupMenuToggle();

@@ -18,6 +18,7 @@
 - **Фронтенд (публичный сайт)**: `public/index.html`, `public/css/style.css`, `public/js/site.js`.
 - **Админка**: `public/dashboard.html`, `public/js/dashboard.js`.
 - **Beget сборка**: `deploy/beget/public_html/` (это docroot для Beget: статика + PHP API).
+- **Фронтенд-зависимости (Beget)**: `deploy/beget/public_html/vendor/` (jquery + slick для каруселей).
 - **PHP API (Beget)**: `deploy/beget/public_html/api/*.php`.
 - **PHP утилиты**: `deploy/beget/public_html/lib/*.php`.
 - **Схема БД и миграции**: `db/schema.sql`, `db/migrations/*.sql`.
@@ -202,6 +203,16 @@ deploy/beget/db/schema.sql
 
 - На мобильном снова работают клики по кнопкам хедера: **Тема**, **Отзыв**, **Меню**.
 - Блок “Воспоминания” переведён на 3D-карусель со Slick, с аккуратным fallback без JS.
+
+Где править “Воспоминания”:
+- HTML: `deploy/beget/public_html/index.html` (секция `.stories`).
+- CSS: `deploy/beget/public_html/css/style.css` (стили карусели/3D).
+- JS: `deploy/beget/public_html/js/site.js` (рендер + init Slick).
+
+Как проверить:
+- **Десктоп**: стрелки и 3D-эффект, центр крупнее.
+- **Мобилка**: нет горизонтального скролла страницы, листается свайпом.
+- **Без JS**: аккуратная горизонтальная лента (fallback).
 
 ---
 

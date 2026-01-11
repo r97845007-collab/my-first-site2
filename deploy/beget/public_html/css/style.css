@@ -205,6 +205,12 @@ summary:focus-visible {
   padding: 0 clamp(16px, 4vw, 40px);
 }
 
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 4vw, 40px);
+}
+
 section {
   padding: 24px 0;
 }
@@ -224,12 +230,33 @@ section {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding: 16px clamp(16px, 4vw, 40px);
+  padding: 16px 0;
+}
+
+.stories {
+  overflow-x: clip;
+}
+
+.stories__slider {
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  perspective: 900px;
+}
+
+.stories__list--fallback {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stories__list--fallback .stories__item {
+  flex: 0 0 240px;
+  scroll-snap-align: center;
 }
 
 .stories__list.slick-initialized {
   display: block;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .stories__list .slick-list {
@@ -257,9 +284,33 @@ section {
   transform: scale(1);
 }
 
+.stories__list .is-current {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.stories__list .is-prev,
+.stories__list .is-next {
+  opacity: 0.75;
+  transform: scale(0.92);
+}
+
+.stories__list .is-prev2,
+.stories__list .is-next2 {
+  opacity: 0.45;
+  transform: scale(0.85);
+}
+
+.stories__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .story-card {
   flex: 0 0 auto;
-  width: 86px;
+  width: 220px;
   text-align: center;
   cursor: pointer;
 }
@@ -272,12 +323,22 @@ section {
 }
 
 .story-avatar {
-  width: 72px;
-  height: 72px;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
   margin: 0 auto 8px;
   object-fit: cover;
   display: block;
+}
+
+@media (max-width: 768px) {
+  .story-card {
+    width: 180px;
+  }
+  .story-avatar {
+    width: 140px;
+    height: 140px;
+  }
 }
 
 .feed__controls {
