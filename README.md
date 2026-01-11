@@ -7,6 +7,8 @@
 
 Для Beget используется **только** папка `deploy/beget/`. Node/Vercel файлы на Beget не нужны.
 
+> Важно: **docroot для Beget** — это `deploy/beget/public_html`.
+
 ---
 
 ## 0) Структура проекта (куда смотреть)
@@ -15,7 +17,7 @@
 
 - **Фронтенд (публичный сайт)**: `public/index.html`, `public/css/style.css`, `public/js/site.js`.
 - **Админка**: `public/dashboard.html`, `public/js/dashboard.js`.
-- **Beget сборка**: `deploy/beget/public_html/` (это копия статики + PHP API).
+- **Beget сборка**: `deploy/beget/public_html/` (это docroot для Beget: статика + PHP API).
 - **PHP API (Beget)**: `deploy/beget/public_html/api/*.php`.
 - **PHP утилиты**: `deploy/beget/public_html/lib/*.php`.
 - **Схема БД и миграции**: `db/schema.sql`, `db/migrations/*.sql`.
@@ -42,6 +44,18 @@ deploy/beget/public_html/
 - файл `.htaccess`
 
 > Важно: **копируйте содержимое** `deploy/beget/public_html` напрямую в `/public_html`, а не саму папку.
+
+---
+
+## Локальный запуск (без сборки)
+
+Самый простой способ проверить локально:
+
+```bash
+php -S localhost:8000 -t deploy/beget/public_html
+```
+
+Откройте `http://localhost:8000` в браузере.
 
 ---
 
@@ -181,6 +195,13 @@ deploy/beget/db/schema.sql
 3. Календарь показывает весь месяц, слоты выбираются.
 4. Отзыв с фото/видео приходит в Telegram.
 5. Фавикон отображается на всех страницах.
+
+---
+
+## Что исправлено в этом шаге
+
+- На мобильном снова работают клики по кнопкам хедера: **Тема**, **Отзыв**, **Меню**.
+- Блок “Воспоминания” переведён на 3D-карусель со Slick, с аккуратным fallback без JS.
 
 ---
 

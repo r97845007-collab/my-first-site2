@@ -312,6 +312,7 @@ const renderStories = () => {
     card.addEventListener("click", () => openStory(story));
     elements.storiesList.appendChild(card);
   });
+  initStoriesCarousel();
 };
 
 const openStory = (story) => {
@@ -633,7 +634,7 @@ const openComments = async (postId) => {
     }
   }
   renderComments();
-  elements.commentModal.showModal();
+  openDialog(elements.commentModal);
 };
 
 const renderComments = () => {
@@ -956,18 +957,61 @@ const setupInfiniteScroll = () => {
   observer.observe(feedSentinel);
 };
 
+const openDialog = (dialog) => {
+  if (!dialog) return;
+  const useFallback = () => {
+    dialog.classList.add("is-open");
+  };
+  if (typeof dialog.showModal === "function") {
+    try {
+      dialog.showModal();
+    } catch (error) {
+      useFallback();
+    }
+  } else {
+    useFallback();
+  }
+  document.body.classList.add("body--locked");
+};
+
+const closeDialog = (dialog) => {
+  if (!dialog) return;
+  if (typeof dialog.close === "function" && dialog.open) {
+    dialog.close();
+  }
+  dialog.classList.remove("is-open");
+  document.body.classList.remove("body--locked");
+};
+
 const setupModals = () => {
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => {
-      button.closest("dialog").close();
+      closeDialog(button.closest("dialog"));
     });
   });
 
   [elements.openReview, elements.reviewCta].forEach((button) => {
-    if (!button) return;
+    if (!button || !elements.reviewModal) return;
     button.addEventListener("click", () => {
-      elements.reviewModal.showModal();
+      openDialog(elements.reviewModal);
     });
+  });
+};
+
+const initStoriesCarousel = () => {
+  if (!elements.storiesList) return;
+  if (!window.jQuery || !window.jQuery.fn?.slick) return;
+  const $list = window.jQuery(elements.storiesList);
+  if ($list.hasClass("slick-initialized")) {
+    $list.slick("unslick");
+  }
+  const showArrows = !window.matchMedia("(max-width: 768px)").matches;
+  $list.slick({
+    centerMode: true,
+    variableWidth: true,
+    infinite: true,
+    arrows: showArrows,
+    swipe: true,
   });
 };
 
@@ -1017,6 +1061,7 @@ const setupComments = () => {
 };
 
 const setupThemeToggle = () => {
+  if (!elements.themeToggle) return;
   elements.themeToggle.addEventListener("click", () => {
     state.theme = state.theme === "dark" ? "light" : "dark";
     saveState();
@@ -1025,6 +1070,7 @@ const setupThemeToggle = () => {
 };
 
 const setupMenuToggle = () => {
+  if (!elements.menuToggle || !elements.mobileMenu || !elements.menuOverlay) return;
   const focusableSelectors =
     'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
   let lastFocused = null;
@@ -1094,7 +1140,7 @@ const setupFavorites = () => {
     document.body.classList.remove("body--locked");
     elements.menuToggle.setAttribute("aria-expanded", "false");
     renderFavorites();
-    elements.favoritesModal.showModal();
+    openDialog(elements.favoritesModal);
   });
 };
 
