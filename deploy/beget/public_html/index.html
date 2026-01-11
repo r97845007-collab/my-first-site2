@@ -48,7 +48,8 @@
           <button class="btn btn--ghost" id="open-review" type="button">
             Оставить отзыв
           </button>
-          <a class="btn" href="#funnel">Записаться</a>
+          <a class="btn topbar__cta" href="#funnel">Записаться</a>
+          <a class="topbar__call" href="tel:+79883415048" aria-label="Позвонить">📞</a>
           <button class="btn btn--ghost" id="menu-toggle" type="button" aria-expanded="false">
             <span class="btn__icon" aria-hidden="true">☰</span>
             Меню
@@ -56,12 +57,18 @@
         </div>
       </header>
 
+      <div class="menu-overlay" id="menu-overlay" aria-hidden="true"></div>
       <nav class="mobile-menu" id="mobile-menu" aria-label="Навигация">
+        <div class="mobile-menu__header">
+          <span class="mobile-menu__title">Меню</span>
+          <button class="btn btn--ghost" id="menu-close" type="button">Закрыть</button>
+        </div>
         <a href="#feed">Лента</a>
         <a href="#routes">Маршруты</a>
         <a href="#calendar">Календарь</a>
         <a href="#reviews">Отзывы</a>
         <a href="#contacts">Контакты</a>
+        <button class="btn btn--ghost" id="favorites-open" type="button">Избранное</button>
       </nav>
 
       <main>
@@ -441,6 +448,16 @@
           </div>
           <p class="hint" id="review-status"></p>
         </form>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="favorites-modal" aria-label="Избранное">
+      <div class="modal__content">
+        <button class="btn btn--ghost" data-close type="button">Закрыть</button>
+        <h3>Избранное</h3>
+        <p class="hint">Ваши сохранённые маршруты хранятся на этом устройстве.</p>
+        <div id="favorites-list" class="feed__grid"></div>
+        <p class="hint" id="favorites-empty">Пока нет сохранённых постов.</p>
       </div>
     </dialog>
 

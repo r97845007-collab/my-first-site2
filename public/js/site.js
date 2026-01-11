@@ -152,6 +152,7 @@ const ASSETS = {
 
 
 const elements = {
+  topbar: document.querySelector(".topbar"),
   storiesList: document.getElementById("stories-list"),
   feedGrid: document.getElementById("feed-grid"),
   feedStatus: document.getElementById("feed-status"),
@@ -175,7 +176,13 @@ const elements = {
   reviewCta: document.getElementById("review-cta"),
   themeToggle: document.getElementById("theme-toggle"),
   menuToggle: document.getElementById("menu-toggle"),
+  menuClose: document.getElementById("menu-close"),
+  menuOverlay: document.getElementById("menu-overlay"),
   mobileMenu: document.getElementById("mobile-menu"),
+  favoritesOpen: document.getElementById("favorites-open"),
+  favoritesModal: document.getElementById("favorites-modal"),
+  favoritesList: document.getElementById("favorites-list"),
+  favoritesEmpty: document.getElementById("favorites-empty"),
   slots: document.getElementById("slots"),
   routeGrid: document.getElementById("route-grid"),
   slotGrid: document.getElementById("slot-grid"),
@@ -216,6 +223,11 @@ const loadState = () => {
 const applyTheme = () => {
   document.documentElement.dataset.theme = state.theme;
   elements.themeToggle.setAttribute("aria-pressed", state.theme === "dark");
+};
+
+const applyTopbarState = () => {
+  if (!elements.topbar) return;
+  elements.topbar.classList.toggle("topbar--compact", window.scrollY > 80);
 };
 
 const fetchJson = async (url, options = {}) => {
@@ -453,12 +465,32 @@ const handlePostAction = async (post, action) => {
   if (action === "share") {
     const url = `${window.location.origin}${window.location.pathname}#post-${post.id}`;
     try {
-      await navigator.clipboard.writeText(url);
-      elements.telegramStatus.textContent = "Ссылка скопирована";
+      if (navigator.share) {
+        await navigator.share({
+          title: document.title,
+          text: post.caption,
+          url,
+        });
+        elements.telegramStatus.textContent = "Открыто меню отправки";
+      } else {
+        await navigator.clipboard.writeText(url);
+        elements.telegramStatus.textContent = "Ссылка скопирована";
+      }
     } catch (error) {
       elements.telegramStatus.textContent = "Скопируйте ссылку вручную: " + url;
     }
   }
+};
+
+const renderFavorites = () => {
+  if (!elements.favoritesList) return;
+  const savedIds = Object.keys(state.saves).filter((id) => state.saves[id]);
+  const savedPosts = savedIds
+    .map((id) => postsData.find((post) => String(post.id) === String(id)))
+    .filter(Boolean);
+  elements.favoritesList.innerHTML = "";
+  savedPosts.forEach((post) => elements.favoritesList.appendChild(createPostCard(post)));
+  elements.favoritesEmpty.hidden = savedPosts.length > 0;
 };
 
 const openComments = async (postId) => {
@@ -742,10 +774,76 @@ const setupThemeToggle = () => {
 };
 
 const setupMenuToggle = () => {
-  elements.menuToggle.addEventListener("click", () => {
-    const isOpen = elements.mobileMenu.style.display === "flex";
-    elements.mobileMenu.style.display = isOpen ? "none" : "flex";
-    elements.menuToggle.setAttribute("aria-expanded", String(!isOpen));
+  const focusableSelectors =
+    'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+  let lastFocused = null;
+
+  const closeMenu = () => {
+    elements.mobileMenu.classList.remove("is-open");
+    elements.menuOverlay.classList.remove("is-open");
+    document.body.classList.remove("body--locked");
+    elements.menuToggle.setAttribute("aria-expanded", "false");
+    if (lastFocused) lastFocused.focus();
+  };
+
+  const openMenu = () => {
+    lastFocused = document.activeElement;
+    elements.mobileMenu.classList.add("is-open");
+    elements.menuOverlay.classList.add("is-open");
+    document.body.classList.add("body--locked");
+    elements.menuToggle.setAttribute("aria-expanded", "true");
+    const focusable = elements.mobileMenu.querySelectorAll(focusableSelectors);
+    if (focusable.length) focusable[0].focus();
+  };
+
+  const toggleMenu = () => {
+    const isOpen = elements.mobileMenu.classList.contains("is-open");
+    if (isOpen) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  };
+
+  elements.menuToggle.addEventListener("click", toggleMenu);
+  elements.menuClose?.addEventListener("click", closeMenu);
+  elements.menuOverlay?.addEventListener("click", closeMenu);
+
+  elements.mobileMenu.addEventListener("click", (event) => {
+    if (event.target.tagName === "A") {
+      closeMenu();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && elements.mobileMenu.classList.contains("is-open")) {
+      closeMenu();
+    }
+    if (event.key === "Tab" && elements.mobileMenu.classList.contains("is-open")) {
+      const focusable = Array.from(elements.mobileMenu.querySelectorAll(focusableSelectors));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  });
+};
+
+const setupFavorites = () => {
+  if (!elements.favoritesOpen || !elements.favoritesModal) return;
+  elements.favoritesOpen.addEventListener("click", () => {
+    elements.mobileMenu.classList.remove("is-open");
+    elements.menuOverlay.classList.remove("is-open");
+    document.body.classList.remove("body--locked");
+    elements.menuToggle.setAttribute("aria-expanded", "false");
+    renderFavorites();
+    elements.favoritesModal.showModal();
   });
 };
 
@@ -992,6 +1090,7 @@ const loadAvailability = async () => {
 const init = async () => {
   loadState();
   applyTheme();
+  applyTopbarState();
   await loadPublicData();
   renderStories();
   renderSlots();
@@ -1007,10 +1106,12 @@ const init = async () => {
   setupComments();
   setupThemeToggle();
   setupMenuToggle();
+  setupFavorites();
   setupWizard();
   setupForm();
   setupReviewForm();
   renderPosts();
+  window.addEventListener("scroll", applyTopbarState, { passive: true });
 };
 
 init();
