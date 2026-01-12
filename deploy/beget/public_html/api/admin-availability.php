@@ -7,13 +7,25 @@ $isPublic = ($_GET['public'] ?? '') === '1';
 if ($method === 'GET') {
     if ($isPublic) {
         $date = trim((string)($_GET['date'] ?? ''));
+        $from = trim((string)($_GET['from'] ?? ''));
+        $to = trim((string)($_GET['to'] ?? ''));
         $params = [];
         $conditions = [];
         if ($date !== '') {
             $conditions[] = 'date = ?';
             $params[] = $date;
         } else {
-            $conditions[] = 'date >= CURDATE()';
+            if ($from !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
+                $conditions[] = 'date >= ?';
+                $params[] = $from;
+            }
+            if ($to !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+                $conditions[] = 'date <= ?';
+                $params[] = $to;
+            }
+            if (!$conditions) {
+                $conditions[] = 'date >= CURDATE()';
+            }
         }
         $whereSql = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
         $sql = 'SELECT id, date, time_slot, route_tag, is_available, time_slot AS time FROM availability ' . $whereSql . ' ORDER BY date ASC, time_slot ASC';

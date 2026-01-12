@@ -40,8 +40,9 @@ if ($method === 'POST') {
     $isJson = str_starts_with($contentType, 'application/json');
     $data = $isJson ? parseJsonBody() : $_POST;
 
-    $rawType = (string)($data['type'] ?? 'post');
-    $type = in_array($rawType, ['post', 'memory', 'funnel'], true) ? $rawType : 'post';
+    $rawType = strtolower(trim((string)($data['type'] ?? 'post')));
+    $normalizedType = in_array($rawType, ['photo', 'reel'], true) ? 'post' : $rawType;
+    $type = in_array($normalizedType, ['post', 'memory', 'funnel'], true) ? $normalizedType : 'post';
     $title = trim((string)($data['title'] ?? $data['caption'] ?? ''));
     $body = trim((string)($data['body'] ?? $data['caption'] ?? ''));
     $routeTag = trim((string)($data['route_tag'] ?? $data['routeTag'] ?? ''));
@@ -75,6 +76,22 @@ if ($method === 'POST') {
             'INSERT INTO media (id, telegram_file_id, kind) VALUES (?, ?, ?)',
             [$mediaId, $fileId, $kind]
         );
+    }
+
+    if ($rawType === 'review') {
+        $reviewText = $body !== '' ? $body : $title;
+        if ($reviewText === '') {
+            sendError(400, 'Review text is required');
+        }
+        $status = $isPublished ? 'approved' : 'pending';
+        $reviewId = db_exec(
+            'INSERT INTO reviews (name, rating, text, status) VALUES (?, ?, ?, ?)',
+            [null, null, $reviewText, $status]
+        );
+        if ($mediaId) {
+            db_exec('INSERT INTO review_media (review_id, media_id) VALUES (?, ?)', [$reviewId, $mediaId]);
+        }
+        sendJson(200, ['ok' => true, 'id' => (int) $reviewId]);
     }
 
     $postId = db_exec(

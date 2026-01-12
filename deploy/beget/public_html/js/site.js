@@ -201,12 +201,18 @@ const elements = {
   reelClose: document.getElementById("reel-close"),
 };
 
+const TOPBAR_COMPACT_ON = 96;
+const TOPBAR_COMPACT_OFF = 64;
+let topbarCompact = false;
+let topbarRaf = null;
+
 let activeFilter = "all";
 let visibleCount = 6;
 let activePostId = null;
 let postsData = [...posts];
 let storiesData = [...stories];
 let slotsData = [...slots];
+let reviewsData = [...reviews];
 let feedCursor = null;
 let feedHasMore = true;
 let feedLoading = false;
@@ -238,7 +244,19 @@ const applyTheme = () => {
 
 const applyTopbarState = () => {
   if (!elements.topbar) return;
-  elements.topbar.classList.toggle("topbar--compact", window.scrollY > 80);
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const shouldCompact = topbarCompact ? scrollY > TOPBAR_COMPACT_OFF : scrollY > TOPBAR_COMPACT_ON;
+  if (shouldCompact === topbarCompact) return;
+  topbarCompact = shouldCompact;
+  elements.topbar.classList.toggle("topbar--compact", topbarCompact);
+};
+
+const scheduleTopbarUpdate = () => {
+  if (topbarRaf) return;
+  topbarRaf = window.requestAnimationFrame(() => {
+    topbarRaf = null;
+    applyTopbarState();
+  });
 };
 
 const fetchJson = async (url, options = {}) => {
@@ -281,6 +299,7 @@ const normalizePost = (post) => ({
 
 const normalizeSlot = (slot) => ({
   ...slot,
+  is_available: Number(slot.is_available) ? 1 : 0,
   label: slot.label || slot.route_tag || "Свободный слот",
   time: slot.time || slot.time_slot || "",
 });
@@ -744,6 +763,35 @@ let calendarCursor = new Date();
 
 const formatDate = (date) => date.toISOString().split("T")[0];
 
+const getMonthRange = (date) => {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { from: formatDate(start), to: formatDate(end) };
+};
+
+const mergeSlots = (incoming) => {
+  const map = new Map(slotsData.map((slot) => [slot.id, slot]));
+  incoming.forEach((slot) => {
+    map.set(slot.id, slot);
+  });
+  slotsData = Array.from(map.values());
+};
+
+const syncSelectedSlot = () => {
+  if (!state.selectedSlot) return;
+  const selected = slotsData.find((slot) => slot.id === state.selectedSlot);
+  if (!selected) {
+    state.selectedSlot = null;
+    return;
+  }
+  if (state.selectedDate && selected.date !== state.selectedDate) {
+    state.selectedSlot = null;
+  }
+  if (state.selectedRoute && selected.route_tag !== "all" && selected.route_tag !== state.selectedRoute) {
+    state.selectedSlot = null;
+  }
+};
+
 const renderCalendarDay = () => {
   if (!elements.calendarSlots || !elements.calendarDayTitle) return;
   if (!state.selectedDate) {
@@ -787,7 +835,11 @@ const renderCalendarDay = () => {
       card.addEventListener("click", () => {
         if (!slot.is_available) return;
         state.selectedSlot = slot.id;
+        if (slot.route_tag && slot.route_tag !== "all") {
+          state.selectedRoute = slot.route_tag;
+        }
         saveState();
+        renderWizardRoutes();
         renderWizardSlots();
       });
       groupGrid.appendChild(card);
@@ -824,8 +876,9 @@ const renderCalendar = () => {
     const dateString = formatDate(date);
     const dateSlots = slotsData.filter((slot) => slot.date === dateString);
     const availableCount = dateSlots.filter((slot) => slot.is_available).length;
+    const hasAvailable = availableCount > 0;
     const cell = document.createElement("div");
-    cell.className = "calendar-cell";
+    cell.className = `calendar-cell ${hasAvailable ? "" : "is-disabled"}`;
     const meta = availableCount
       ? `${availableCount} слота`
       : dateSlots.length
@@ -835,17 +888,30 @@ const renderCalendar = () => {
       <button type="button" data-date="${dateString}">${day}</button>
       <span class="calendar-cell__meta">${meta}</span>
     `;
-    cell.querySelector("button").addEventListener("click", () => {
+    const button = cell.querySelector("button");
+    if (!hasAvailable) {
+      button.disabled = true;
+    }
+    button.addEventListener("click", () => {
+      if (!hasAvailable) return;
       state.selectedDate = dateString;
+      syncSelectedSlot();
       saveState();
       renderCalendarDay();
+      renderWizardSlots();
     });
     elements.calendarGrid.appendChild(cell);
   }
 };
 
 const renderWizardRoutes = () => {
-  const tags = Array.from(new Set(postsData.map((post) => post.routeTag)));
+  const tags = [];
+  const addTag = (tag) => {
+    if (!tag || tag === "all" || tags.includes(tag)) return;
+    tags.push(tag);
+  };
+  slotsData.forEach((slot) => addTag(slot.route_tag));
+  postsData.forEach((post) => addTag(post.routeTag));
   elements.routeGrid.innerHTML = "";
   tags.forEach((tag) => {
     const card = document.createElement("button");
@@ -858,11 +924,9 @@ const renderWizardRoutes = () => {
     card.addEventListener("click", () => {
       state.selectedRoute = tag;
       saveState();
-      loadAvailability().then(() => {
-        renderSlots();
-        renderWizardSlots();
-      });
       renderWizardRoutes();
+      renderCalendarDay();
+      renderWizardSlots();
     });
     elements.routeGrid.appendChild(card);
   });
@@ -870,11 +934,20 @@ const renderWizardRoutes = () => {
 
 const renderWizardSlots = () => {
   elements.slotGrid.innerHTML = "";
+  if (!state.selectedDate) {
+    elements.slotGrid.innerHTML = "<p class=\"hint\">Выберите дату в календаре.</p>";
+    return;
+  }
   const filteredSlots = slotsData.filter((slot) => {
     if (!slot.is_available) return false;
+    if (slot.date !== state.selectedDate) return false;
     if (!state.selectedRoute) return true;
     return slot.route_tag === "all" || slot.route_tag === state.selectedRoute;
   });
+  if (!filteredSlots.length) {
+    elements.slotGrid.innerHTML = "<p class=\"hint\">Нет доступных слотов.</p>";
+    return;
+  }
   filteredSlots.forEach((slot) => {
     const card = document.createElement("button");
     card.type = "button";
@@ -891,6 +964,7 @@ const renderWizardSlots = () => {
     card.addEventListener("click", () => {
       if (isDisabled) return;
       state.selectedSlot = slot.id;
+      state.selectedDate = slot.date;
       saveState();
       renderWizardSlots();
     });
@@ -903,17 +977,10 @@ const renderWizardSlots = () => {
 
 const renderReviews = () => {
   elements.reviewGrid.innerHTML = "";
-  const reviewPosts = postsData.filter((post) => post.type === "review");
-  const list = reviewPosts.length
-    ? reviewPosts.map((post) => ({
-        id: post.id,
-        author: post.caption.split("—")[0] || "Гость",
-        text: post.caption,
-        media_kind: post.media_kind,
-        telegram_file_id: post.telegram_file_id,
-      }))
-    : reviews;
+  const list = reviewsData && reviewsData.length ? reviewsData : reviews;
   list.forEach((review) => {
+    const author = review.author || review.name || "Гость";
+    const text = review.text || review.body || review.caption || "";
     const mediaKind = review.media_kind === "video" || review.media_kind === "telegram_video" ? "video" : "photo";
     const mediaUrl = review.media_url || "";
     const card = document.createElement("article");
@@ -923,11 +990,11 @@ const renderReviews = () => {
         ${
           mediaUrl && mediaKind === "video"
             ? `<video src="${mediaUrl}" controls preload="metadata"></video>`
-            : `<img src="${mediaUrl || ASSETS.review}" alt="Отзыв ${review.author}" loading="lazy" />`
+            : `<img src="${mediaUrl || ASSETS.review}" alt="Отзыв ${author}" loading="lazy" />`
         }
       </div>
-      <strong>${review.author}</strong>
-      <p>${review.text}</p>
+      <strong>${author}</strong>
+      <p>${text}</p>
     `;
     const img = card.querySelector("img");
     if (img) {
@@ -1086,6 +1153,41 @@ const setupModals = () => {
   });
 };
 
+const ensureStoriesArrows = () => {
+  const viewport = document.getElementById("stories-slider");
+  if (!viewport) return null;
+  const arrowSvg =
+    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8.5 5.5l7 6.5-7 6.5-1.5-1.6 5.2-4.9-5.2-4.9z"/></svg>';
+  let prev = viewport.querySelector(".stories__arrow--prev");
+  let next = viewport.querySelector(".stories__arrow--next");
+  if (!prev) {
+    prev = document.createElement("button");
+    prev.type = "button";
+    prev.className = "stories__arrow stories__arrow--prev";
+    prev.setAttribute("aria-label", "Previous story");
+    prev.innerHTML = `<span aria-hidden="true" style="transform: rotate(180deg); display: inline-flex;">${arrowSvg}</span>`;
+    viewport.appendChild(prev);
+  }
+  if (!next) {
+    next = document.createElement("button");
+    next.type = "button";
+    next.className = "stories__arrow stories__arrow--next";
+    next.setAttribute("aria-label", "Next story");
+    next.innerHTML = `<span aria-hidden="true" style="display: inline-flex;">${arrowSvg}</span>`;
+    viewport.appendChild(next);
+  }
+  return { prev, next };
+};
+
+const updateStoriesArrows = ($list, arrows) => {
+  if (!$list || !arrows) return;
+  const current = $list.slick("slickCurrentSlide");
+  const total = $list.slick("getSlick").slideCount;
+  const lastIndex = Math.max(total - 1, 0);
+  arrows.prev.disabled = current <= 0;
+  arrows.next.disabled = current >= lastIndex;
+};
+
 const initStoriesCarousel = () => {
   if (!elements.storiesList) return;
   if (!window.jQuery || !window.jQuery.fn?.slick) {
@@ -1096,13 +1198,16 @@ const initStoriesCarousel = () => {
   if ($list.hasClass("slick-initialized")) {
     return;
   }
+  const arrows = ensureStoriesArrows();
   elements.storiesList.classList.remove("stories__list--fallback");
   const showArrows = !window.matchMedia("(max-width: 768px)").matches;
   $list.on("init", () => {
     applyStories3DClasses();
+    updateStoriesArrows($list, arrows);
   });
   $list.on("afterChange", () => {
     applyStories3DClasses();
+    updateStoriesArrows($list, arrows);
   });
   $list.slick({
     centerMode: true,
@@ -1110,18 +1215,25 @@ const initStoriesCarousel = () => {
     variableWidth: false,
     infinite: false,
     arrows: showArrows,
+    prevArrow: arrows?.prev || undefined,
+    nextArrow: arrows?.next || undefined,
+    slidesToScroll: 1,
     dots: false,
+    swipe: true,
+    touchMove: true,
+    draggable: true,
     swipeToSlide: true,
     adaptiveHeight: false,
     slidesToShow: 3,
     responsive: [
       {
         breakpoint: 768,
-        settings: { slidesToShow: 1, arrows: false, centerMode: true },
+        settings: { slidesToShow: 1, arrows: false, centerMode: true, swipe: true, touchMove: true },
       },
     ],
   });
   applyStories3DClasses();
+  updateStoriesArrows($list, arrows);
 };
 
 const applyStories3DClasses = () => {
@@ -1290,13 +1402,21 @@ const setupCalendarNavigation = () => {
   if (!elements.calendarPrev || !elements.calendarNext) return;
   elements.calendarPrev.addEventListener("click", () => {
     calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
-    renderCalendar();
-    renderCalendarDay();
+    const range = getMonthRange(calendarCursor);
+    loadAvailability({ from: range.from, to: range.to, merge: true }).then(() => {
+      renderCalendar();
+      renderCalendarDay();
+      renderWizardSlots();
+    });
   });
   elements.calendarNext.addEventListener("click", () => {
     calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
-    renderCalendar();
-    renderCalendarDay();
+    const range = getMonthRange(calendarCursor);
+    loadAvailability({ from: range.from, to: range.to, merge: true }).then(() => {
+      renderCalendar();
+      renderCalendarDay();
+      renderWizardSlots();
+    });
   });
 };
 
@@ -1481,6 +1601,11 @@ const loadStoriesFromApi = async () => {
   storiesData = response.items || storiesData;
 };
 
+const loadReviewsFromApi = async () => {
+  const response = await fetchJson("/api/reviews.php");
+  reviewsData = response.items || reviewsData;
+};
+
 const loadFeedFromApi = async (reset = false) => {
   if (feedLoading || (!feedHasMore && !reset)) return;
   feedLoading = true;
@@ -1527,19 +1652,40 @@ const loadPublicData = async () => {
     // fallback
   }
 
-  await loadAvailability();
+  try {
+    await loadReviewsFromApi();
+  } catch (error) {
+    // fallback
+  }
+
+  const now = new Date();
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const rangeStart = getMonthRange(prevMonth);
+  const rangeEnd = getMonthRange(nextMonth);
+  await loadAvailability({ from: rangeStart.from, to: rangeEnd.to });
 };
 
-const loadAvailability = async () => {
+const loadAvailability = async (range = {}) => {
   try {
-    const availabilityResponse = await fetchJson("/api/admin-availability.php?public=1");
-    slotsData = (availabilityResponse.slots || slotsData).map(normalizeSlot);
+    const params = new URLSearchParams();
+    params.set("public", "1");
+    if (range.from) params.set("from", range.from);
+    if (range.to) params.set("to", range.to);
+    const availabilityResponse = await fetchJson(`/api/admin-availability.php?${params.toString()}`);
+    const nextSlots = (availabilityResponse.slots || []).map(normalizeSlot);
+    if (range.merge) {
+      mergeSlots(nextSlots);
+    } else {
+      slotsData = nextSlots;
+    }
     if (!state.selectedDate && slotsData.length) {
       const today = formatDate(new Date());
       const dates = Array.from(new Set(slotsData.map((slot) => slot.date))).sort();
       state.selectedDate = dates.includes(today) ? today : dates[0];
       saveState();
     }
+    syncSelectedSlot();
     if (state.selectedDate) {
       const selected = new Date(state.selectedDate);
       if (!Number.isNaN(selected.getTime())) {
@@ -1554,7 +1700,8 @@ const loadAvailability = async () => {
 const init = async () => {
   loadState();
   applyTheme();
-  applyTopbarState();
+  topbarCompact = elements.topbar?.classList.contains("topbar--compact") || false;
+  scheduleTopbarUpdate();
   await loadPublicData();
   renderStories();
   renderCalendar();
@@ -1579,7 +1726,7 @@ const init = async () => {
   setupForm();
   setupReviewForm();
   renderPosts();
-  window.addEventListener("scroll", applyTopbarState, { passive: true });
+  window.addEventListener("scroll", scheduleTopbarUpdate, { passive: true });
 };
 
 init();
