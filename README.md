@@ -29,3 +29,21 @@
 ## Важно
 - `vendor/` — фронтенд-зависимости (jquery/slick). PHP-исполнение там запрещено через `.htaccess`.
 - Если появится `uploads/`, запретите выполнение PHP и листинг (как в корне).
+## Deploy to Beget (rsync по SSH)
+1. Настройте SSH-ключи:
+   - `ssh-keygen -t ed25519 -C "beget-deploy"`
+   - добавьте публичный ключ в Beget.
+2. Создайте `deploy/beget/public_html/api/config.local.php` на сервере (в репо не хранится).
+3. Запуск деплоя:
+   - Linux/macOS/WSL:
+     - `export BEGET_HOST=example.ru`
+     - `export BEGET_USER=username`
+     - `export BEGET_PORT=22`
+     - `export BEGET_REMOTE_PATH=~/public_html/`
+     - `./scripts/deploy-beget.sh`
+   - Windows PowerShell:
+     - `$env:BEGET_HOST="example.ru"`
+     - `$env:BEGET_USER="username"`
+     - `$env:BEGET_PORT="22"`
+     - `$env:BEGET_REMOTE_PATH="~/public_html/"`
+     - `./scripts/deploy-beget.ps1`
