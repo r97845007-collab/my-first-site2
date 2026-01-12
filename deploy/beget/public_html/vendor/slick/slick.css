@@ -1,0 +1,32 @@
+.slick-list {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.slick-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slick-slide {
+  scroll-snap-align: center;
+}
+
+.slick-arrow {
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.slick-prev {
+  margin-right: 8px;
+}
+
+.slick-next {
+  margin-left: 8px;
+}

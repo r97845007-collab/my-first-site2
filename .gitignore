@@ -1,0 +1,14 @@
+# Secrets
+config.local.php
+*.env
+.env*
+
+# Common generated/volatile paths
+uploads/
+cache/
+tmp/
+logs/
+node_modules/
+
+# Ensure deploy folder is tracked
+!deploy/

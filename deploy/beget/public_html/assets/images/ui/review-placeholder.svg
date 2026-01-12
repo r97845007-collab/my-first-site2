@@ -1,0 +1,13 @@
+<svg width="800" height="400" viewBox="0 0 800 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="review" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0.25" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="400" rx="40" fill="url(#review)" />
+  <path d="M160 160C160 120 190 90 230 90H570C610 90 640 120 640 160V240C640 280 610 310 570 310H260L180 350V310H230C190 310 160 280 160 240V160Z" fill="#FFFFFF" fill-opacity="0.5" />
+  <text x="400" y="240" fill="#0F172A" font-size="28" text-anchor="middle" font-family="Segoe UI, sans-serif">
+    Отзыв гостя
+  </text>
+</svg>
