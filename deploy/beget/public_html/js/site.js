@@ -203,8 +203,16 @@ const elements = {
 
 const TOPBAR_COMPACT_ON = 96;
 const TOPBAR_COMPACT_OFF = 64;
+const TOPBAR_LOCK_MS = 260;
 let topbarCompact = false;
 let topbarRaf = null;
+let topbarTransitioning = false;
+let topbarPending = null;
+let topbarUnlockTimer = null;
+let storiesSwipeBound = false;
+let reelActiveIndex = 0;
+let reelMuted = true;
+let reelPosts = [];
 
 let activeFilter = "all";
 let visibleCount = 6;
@@ -242,13 +250,37 @@ const applyTheme = () => {
   elements.themeToggle.setAttribute("aria-pressed", state.theme === "dark");
 };
 
+const releaseTopbarLock = () => {
+  if (!topbarTransitioning) return;
+  topbarTransitioning = false;
+  if (topbarPending !== null && topbarPending !== topbarCompact) {
+    const pending = topbarPending;
+    topbarPending = null;
+    setTopbarCompact(pending);
+  }
+};
+
+const setTopbarCompact = (nextState) => {
+  if (!elements.topbar) return;
+  if (topbarCompact === nextState) return;
+  topbarCompact = nextState;
+  topbarTransitioning = true;
+  elements.topbar.classList.toggle("topbar--compact", topbarCompact);
+  if (topbarUnlockTimer) {
+    window.clearTimeout(topbarUnlockTimer);
+  }
+  topbarUnlockTimer = window.setTimeout(releaseTopbarLock, TOPBAR_LOCK_MS);
+};
+
 const applyTopbarState = () => {
   if (!elements.topbar) return;
   const scrollY = window.scrollY || window.pageYOffset || 0;
   const shouldCompact = topbarCompact ? scrollY > TOPBAR_COMPACT_OFF : scrollY > TOPBAR_COMPACT_ON;
-  if (shouldCompact === topbarCompact) return;
-  topbarCompact = shouldCompact;
-  elements.topbar.classList.toggle("topbar--compact", topbarCompact);
+  if (topbarTransitioning) {
+    topbarPending = shouldCompact;
+    return;
+  }
+  setTopbarCompact(shouldCompact);
 };
 
 const scheduleTopbarUpdate = () => {
@@ -283,6 +315,13 @@ const parseHashtags = (value) => {
   } catch (error) {
     return splitHashtags(value);
   }
+};
+
+const parseDate = (value) => {
+  if (!value) return null;
+  const parts = String(value).split("-").map((item) => Number(item));
+  if (parts.length !== 3 || parts.some((item) => Number.isNaN(item))) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
 };
 
 const normalizePost = (post) => ({
@@ -630,17 +669,114 @@ const getReelPosts = () =>
       (post.type === "reel" || post.media_kind === "video" || post.media_kind === "telegram_video")
   );
 
+const getReelPostById = (id) => reelPosts.find((post) => String(post.id) === String(id));
+
+const updateReelButtons = () => {
+  const active = reelPosts[reelActiveIndex];
+  if (!active || !elements.reelTrack) return;
+  const activeItem = elements.reelTrack.querySelector(`[data-post-id="${active.id}"]`);
+  if (!activeItem) return;
+  const likeBtn = activeItem.querySelector("[data-reel-action='like']");
+  if (likeBtn) {
+    likeBtn.classList.toggle("is-active", Boolean(active.is_favorited));
+  }
+};
+
+const setVideoSource = (video, source) => {
+  if (!video) return;
+  if (video.getAttribute("data-src") === source && video.getAttribute("src")) return;
+  video.setAttribute("data-src", source);
+  video.setAttribute("src", source);
+  video.load();
+};
+
+const clearVideoSource = (video) => {
+  if (!video) return;
+  if (!video.getAttribute("src")) return;
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+};
+
+const updateReelWindow = (index) => {
+  if (!elements.reelTrack) return;
+  const items = Array.from(elements.reelTrack.querySelectorAll(".reel-item"));
+  items.forEach((item, itemIndex) => {
+    const video = item.querySelector("video");
+    if (!video) return;
+    const postId = item.dataset.postId;
+    const post = getReelPostById(postId);
+    if (!post) return;
+    const shouldLoad = Math.abs(itemIndex - index) <= 1;
+    if (shouldLoad) {
+      setVideoSource(video, post.media_url);
+      video.muted = reelMuted;
+      video.preload = "metadata";
+    } else {
+      clearVideoSource(video);
+      video.preload = "none";
+    }
+  });
+};
+
+const attachReelProgress = (item, video) => {
+  const bar = item.querySelector(".reel-progress__bar");
+  if (!bar || !video) return () => {};
+  const onTime = () => {
+    if (!video.duration) {
+      bar.style.width = "0%";
+      return;
+    }
+    bar.style.width = `${Math.min(100, (video.currentTime / video.duration) * 100)}%`;
+  };
+  video.addEventListener("timeupdate", onTime);
+  return () => video.removeEventListener("timeupdate", onTime);
+};
+
+let reelProgressCleanup = null;
+
+const setActiveReel = (index) => {
+  if (!elements.reelTrack) return;
+  reelActiveIndex = Math.max(0, Math.min(index, reelPosts.length - 1));
+  updateReelWindow(reelActiveIndex);
+  const items = Array.from(elements.reelTrack.querySelectorAll(".reel-item"));
+  items.forEach((item, itemIndex) => {
+    const video = item.querySelector("video");
+    if (!video) return;
+    if (itemIndex === reelActiveIndex) {
+      video.muted = reelMuted;
+      video.play().catch(() => {});
+      if (reelProgressCleanup) reelProgressCleanup();
+      reelProgressCleanup = attachReelProgress(item, video);
+    } else {
+      video.pause();
+    }
+  });
+  updateReelButtons();
+};
+
 const openReelViewer = (postId) => {
   if (!elements.reelViewer || !elements.reelTrack) return;
-  const reels = getReelPosts();
+  const reels = getReelPosts().slice(0, 40);
   if (!reels.length) return;
+  reelPosts = reels;
   elements.reelTrack.innerHTML = "";
   reels.forEach((post) => {
     const item = document.createElement("section");
     item.className = "reel-item";
     item.dataset.postId = post.id;
     item.innerHTML = `
-      <video src="${post.media_url}" playsinline controls preload="metadata"></video>
+      <div class="reel-item__content">
+        <video data-src="${post.media_url}" playsinline preload="none" muted></video>
+        <div class="reel-progress"><span class="reel-progress__bar"></span></div>
+        <div class="reel-actions">
+          <button class="reel-action" data-reel-action="like" type="button" aria-label="Лайк">♡</button>
+          <button class="reel-action" data-reel-action="comment" type="button" aria-label="Комментарий">💬</button>
+          <button class="reel-action" data-reel-action="share" type="button" aria-label="Поделиться">↗</button>
+          <button class="reel-action" data-reel-action="review" type="button" aria-label="Отзыв">★</button>
+        </div>
+        <button class="reel-mute" type="button" aria-label="Звук">${reelMuted ? "🔇" : "🔊"}</button>
+      </div>
     `;
     elements.reelTrack.appendChild(item);
   });
@@ -660,18 +796,17 @@ const openReelViewer = (postId) => {
   reelObserver = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        const video = entry.target.querySelector("video");
-        if (!video) return;
-        if (entry.isIntersecting) {
-          video.play().catch(() => {});
-        } else {
-          video.pause();
+        if (!entry.isIntersecting) return;
+        const itemIndex = Array.from(elements.reelTrack.children).indexOf(entry.target);
+        if (itemIndex >= 0) {
+          setActiveReel(itemIndex);
         }
       });
     },
-    { threshold: 0.6 }
+    { threshold: 0.6, root: elements.reelTrack }
   );
   Array.from(elements.reelTrack.children).forEach((item) => reelObserver.observe(item));
+  setActiveReel(index);
 };
 
 const closeReelViewer = () => {
@@ -682,6 +817,10 @@ const closeReelViewer = () => {
   if (reelObserver) {
     reelObserver.disconnect();
     reelObserver = null;
+  }
+  if (reelProgressCleanup) {
+    reelProgressCleanup();
+    reelProgressCleanup = null;
   }
 };
 
@@ -700,6 +839,37 @@ const setupReelViewer = () => {
       reelObserver.disconnect();
       reelObserver = null;
     }
+    if (reelProgressCleanup) {
+      reelProgressCleanup();
+      reelProgressCleanup = null;
+    }
+  });
+  elements.reelTrack.addEventListener("click", (event) => {
+    const actionButton = event.target.closest("[data-reel-action]");
+    if (!actionButton) return;
+    const action = actionButton.dataset.reelAction;
+    const item = actionButton.closest(".reel-item");
+    if (!item) return;
+    const post = getReelPostById(item.dataset.postId);
+    if (!post) return;
+    if (action === "review") {
+      openDialog(elements.reviewModal);
+      return;
+    }
+    handlePostAction(post, action);
+    updateReelButtons();
+  });
+  elements.reelTrack.addEventListener("click", (event) => {
+    const muteBtn = event.target.closest(".reel-mute");
+    if (!muteBtn) return;
+    reelMuted = !reelMuted;
+    const videos = Array.from(elements.reelTrack.querySelectorAll("video"));
+    videos.forEach((video) => {
+      video.muted = reelMuted;
+    });
+    elements.reelTrack.querySelectorAll(".reel-mute").forEach((button) => {
+      button.textContent = reelMuted ? "🔇" : "🔊";
+    });
   });
   elements.reelTrack.addEventListener(
     "wheel",
@@ -761,7 +931,12 @@ const renderComments = () => {
 
 let calendarCursor = new Date();
 
-const formatDate = (date) => date.toISOString().split("T")[0];
+const formatDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const getMonthRange = (date) => {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -978,9 +1153,13 @@ const renderWizardSlots = () => {
 const renderReviews = () => {
   elements.reviewGrid.innerHTML = "";
   const list = reviewsData && reviewsData.length ? reviewsData : reviews;
+  const ratings = [];
+  const DEFAULT_REVIEW_RATING = 5;
   list.forEach((review) => {
     const author = review.author || review.name || "Гость";
     const text = review.text || review.body || review.caption || "";
+    const rating = Number.isFinite(Number(review.rating)) ? Number(review.rating) : DEFAULT_REVIEW_RATING;
+    ratings.push(rating);
     const mediaKind = review.media_kind === "video" || review.media_kind === "telegram_video" ? "video" : "photo";
     const mediaUrl = review.media_url || "";
     const card = document.createElement("article");
@@ -994,6 +1173,7 @@ const renderReviews = () => {
         }
       </div>
       <strong>${author}</strong>
+      <div class="rating-stars" aria-label="Рейтинг ${rating} из 5">${renderStars(rating)}</div>
       <p>${text}</p>
     `;
     const img = card.querySelector("img");
@@ -1004,7 +1184,33 @@ const renderReviews = () => {
     }
     elements.reviewGrid.appendChild(card);
   });
+  renderReviewSummary(ratings);
   initReviewCarousel();
+};
+
+const renderStars = (rating) => {
+  const value = Math.max(0, Math.min(5, Math.round(rating)));
+  return Array.from({ length: 5 }, (_, index) => {
+    const filled = index < value ? "star star--filled" : "star";
+    const glyph = index < value ? "★" : "☆";
+    return `<span class="${filled}" aria-hidden="true">${glyph}</span>`;
+  }).join("");
+};
+
+const renderReviewSummary = (ratings) => {
+  const summary = document.getElementById("reviews-summary");
+  if (!summary) return;
+  if (!ratings.length) {
+    summary.innerHTML = "";
+    return;
+  }
+  const avg = ratings.reduce((sum, item) => sum + item, 0) / ratings.length;
+  summary.innerHTML = `
+    <div class="rating-stars rating-stars--summary" aria-label="Средний рейтинг ${avg.toFixed(1)} из 5">
+      ${renderStars(avg)}
+    </div>
+    <span class="rating-value">${avg.toFixed(1)}</span>
+  `;
 };
 
 const initReviewCarousel = () => {
@@ -1266,6 +1472,88 @@ const setupStoriesInteractions = () => {
     if (story) {
       openStory(story);
     }
+  });
+};
+
+const setupStoriesSwipe = () => {
+  if (storiesSwipeBound) return;
+  const viewport = document.getElementById("stories-slider");
+  if (!viewport || !elements.storiesList || !window.jQuery) return;
+  const $list = window.jQuery(elements.storiesList);
+  if (!$list.hasClass("slick-initialized")) return;
+  storiesSwipeBound = true;
+
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let swiping = false;
+  let directionLocked = false;
+  const disableSlickSwipe = () => {
+    $list.slick("slickSetOption", "swipe", false, true);
+    $list.slick("slickSetOption", "touchMove", false, true);
+  };
+  const enableSlickSwipe = () => {
+    $list.slick("slickSetOption", "swipe", true, true);
+    $list.slick("slickSetOption", "touchMove", true, true);
+  };
+
+  const resetSwipe = () => {
+    if (pointerId !== null) {
+      try {
+        viewport.releasePointerCapture(pointerId);
+      } catch (error) {
+        // Ignore capture release errors.
+      }
+    }
+    enableSlickSwipe();
+    pointerId = null;
+    startX = 0;
+    startY = 0;
+    swiping = false;
+    directionLocked = false;
+  };
+
+  viewport.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") return;
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    swiping = false;
+    directionLocked = false;
+    disableSlickSwipe();
+    viewport.setPointerCapture(pointerId);
+  });
+
+  viewport.addEventListener("pointermove", (event) => {
+    if (pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    if (!directionLocked) {
+      if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
+      directionLocked = true;
+      swiping = Math.abs(deltaX) > Math.abs(deltaY);
+    }
+    if (!swiping) return;
+    event.preventDefault();
+  });
+
+  viewport.addEventListener("pointerup", (event) => {
+    if (pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    if (swiping && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 40) {
+      if (deltaX < 0) {
+        $list.slick("slickNext");
+      } else {
+        $list.slick("slickPrev");
+      }
+    }
+    resetSwipe();
+  });
+
+  viewport.addEventListener("pointercancel", (event) => {
+    if (pointerId !== event.pointerId) return;
+    resetSwipe();
   });
 };
 
@@ -1687,8 +1975,8 @@ const loadAvailability = async (range = {}) => {
     }
     syncSelectedSlot();
     if (state.selectedDate) {
-      const selected = new Date(state.selectedDate);
-      if (!Number.isNaN(selected.getTime())) {
+      const selected = parseDate(state.selectedDate);
+      if (selected && !Number.isNaN(selected.getTime())) {
         calendarCursor = new Date(selected.getFullYear(), selected.getMonth(), 1);
       }
     }
@@ -1702,8 +1990,10 @@ const init = async () => {
   applyTheme();
   topbarCompact = elements.topbar?.classList.contains("topbar--compact") || false;
   scheduleTopbarUpdate();
+  elements.topbar?.addEventListener("transitionend", releaseTopbarLock);
   await loadPublicData();
   renderStories();
+  setupStoriesSwipe();
   renderCalendar();
   renderCalendarDay();
   renderWizardRoutes();

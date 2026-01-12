@@ -51,6 +51,10 @@ if ($method === 'POST') {
     $hashtags = $data['hashtags'] ?? '';
     $funnelStage = trim((string)($data['funnel_stage'] ?? $data['funnelStage'] ?? ''));
     $isPublished = (int)($data['is_published'] ?? $data['isPublished'] ?? 1);
+    $rating = isset($data['rating']) ? (int) $data['rating'] : null;
+    if ($rating !== null && ($rating < 1 || $rating > 5)) {
+        $rating = null;
+    }
 
     if ($body === '' && $title === '') {
         sendError(400, 'Caption is required');
@@ -86,7 +90,7 @@ if ($method === 'POST') {
         $status = $isPublished ? 'approved' : 'pending';
         $reviewId = db_exec(
             'INSERT INTO reviews (name, rating, text, status) VALUES (?, ?, ?, ?)',
-            [null, null, $reviewText, $status]
+            [null, $rating, $reviewText, $status]
         );
         if ($mediaId) {
             db_exec('INSERT INTO review_media (review_id, media_id) VALUES (?, ?)', [$reviewId, $mediaId]);
