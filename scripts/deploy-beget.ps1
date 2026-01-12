@@ -64,7 +64,7 @@ $args = @(
   "--exclude", ".ssh/"
 )
 if ($DRY_RUN -eq "1") { $args += "--dry-run" }
-$args += @("-e", "ssh -p $BEGET_PORT", $localPath, "$BEGET_USER@$BEGET_HOST`:$BEGET_REMOTE_PATH")
+$args += @("-e", "ssh -T -o LogLevel=ERROR -p $BEGET_PORT", $localPath, "$BEGET_USER@$BEGET_HOST`:$BEGET_REMOTE_PATH")
 
 & $rsyncCmd @args
 

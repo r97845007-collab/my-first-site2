@@ -60,7 +60,7 @@ rsync -avz --delete \
   --exclude 'uploads/' \
   --exclude '.ssh/' \
   ${DRY_RUN_FLAG} \
-  -e "ssh -p ${BEGET_PORT}" \
+  -e "ssh -T -o LogLevel=ERROR -p ${BEGET_PORT}" \
   "${LOCAL_PATH}" \
   "${BEGET_USER}@${BEGET_HOST}:${BEGET_REMOTE_PATH}"
 
