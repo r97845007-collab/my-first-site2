@@ -254,18 +254,20 @@ section {
   max-width: 100%;
   padding: 12px 0 24px;
   perspective: 900px;
+  contain: layout paint;
   touch-action: pan-y;
 }
 
 .stories__list {
   display: flex;
   gap: 12px;
-  overflow-x: auto;
+  overflow: hidden;
   max-width: 100%;
   padding: 8px 0;
   touch-action: pan-y;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+  will-change: transform;
 }
 
 .stories__list::-webkit-scrollbar {
@@ -273,6 +275,7 @@ section {
 }
 
 .stories__list--fallback {
+  overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
 }
@@ -1106,6 +1109,11 @@ td {
   border: none;
   padding: 0;
   background: transparent;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
 }
 
 .reel-viewer::backdrop {
@@ -1134,6 +1142,12 @@ td {
   scroll-snap-type: y mandatory;
   scroll-snap-stop: always;
   overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  touch-action: pan-y;
+}
+
+.reel-track::-webkit-scrollbar {
+  display: none;
 }
 
 .reel-item {

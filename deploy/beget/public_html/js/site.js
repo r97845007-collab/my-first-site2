@@ -213,6 +213,7 @@ let storiesSwipeBound = false;
 let reelActiveIndex = 0;
 let reelMuted = true;
 let reelPosts = [];
+const REEL_MAX_ITEMS = 24;
 
 let activeFilter = "all";
 let visibleCount = 6;
@@ -757,7 +758,7 @@ const setActiveReel = (index) => {
 
 const openReelViewer = (postId) => {
   if (!elements.reelViewer || !elements.reelTrack) return;
-  const reels = getReelPosts().slice(0, 40);
+  const reels = getReelPosts().slice(0, REEL_MAX_ITEMS);
   if (!reels.length) return;
   reelPosts = reels;
   elements.reelTrack.innerHTML = "";
@@ -1483,6 +1484,8 @@ const setupStoriesSwipe = () => {
   if (!$list.hasClass("slick-initialized")) return;
   storiesSwipeBound = true;
 
+  const LOCK_THRESHOLD = 8;
+  const SWIPE_THRESHOLD = 40;
   let pointerId = null;
   let startX = 0;
   let startY = 0;
@@ -1519,6 +1522,7 @@ const setupStoriesSwipe = () => {
 
   viewport.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse") return;
+    if (!event.isPrimary) return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
@@ -1532,15 +1536,19 @@ const setupStoriesSwipe = () => {
     const deltaX = event.clientX - startX;
     const deltaY = event.clientY - startY;
     if (!directionLocked) {
-      if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
+      if (Math.abs(deltaX) < LOCK_THRESHOLD && Math.abs(deltaY) < LOCK_THRESHOLD) return;
       directionLocked = true;
       swiping = Math.abs(deltaX) > Math.abs(deltaY);
     }
     if (!swiping) return;
     if (!captured) {
       disableSlickSwipe();
-      viewport.setPointerCapture(pointerId);
-      captured = true;
+      try {
+        viewport.setPointerCapture(pointerId);
+        captured = true;
+      } catch (error) {
+        captured = false;
+      }
     }
     event.preventDefault();
   });
@@ -1549,7 +1557,7 @@ const setupStoriesSwipe = () => {
     if (pointerId !== event.pointerId) return;
     const deltaX = event.clientX - startX;
     const deltaY = event.clientY - startY;
-    if (swiping && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 40) {
+    if (swiping && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
       if (deltaX < 0) {
         $list.slick("slickNext");
       } else {
