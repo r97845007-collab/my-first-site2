@@ -1,0 +1,14 @@
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0.5" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" rx="48" fill="url(#gradient)" />
+  <circle cx="140" cy="140" r="60" fill="#FFFFFF" fill-opacity="0.4" />
+  <path d="M120 310L260 190L360 270L520 120L700 310V480H120V310Z" fill="#FFFFFF" fill-opacity="0.35" />
+  <text x="400" y="520" fill="#0F172A" font-size="32" text-anchor="middle" font-family="Segoe UI, sans-serif">
+    Фото будет добавлено позже
+  </text>
+</svg>
