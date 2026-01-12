@@ -34,16 +34,26 @@
    - `ssh-keygen -t ed25519 -C "beget-deploy"`
    - добавьте публичный ключ в Beget.
 2. Создайте `deploy/beget/public_html/api/config.local.php` на сервере (в репо не хранится).
-3. Запуск деплоя:
-   - Linux/macOS/WSL:
-     - `export BEGET_HOST=example.ru`
-     - `export BEGET_USER=username`
-     - `export BEGET_PORT=22`
-     - `export BEGET_REMOTE_PATH=~/public_html/`
-     - `./scripts/deploy-beget.sh`
-   - Windows PowerShell:
-     - `$env:BEGET_HOST="example.ru"`
-     - `$env:BEGET_USER="username"`
-     - `$env:BEGET_PORT="22"`
-     - `$env:BEGET_REMOTE_PATH="~/public_html/"`
-     - `./scripts/deploy-beget.ps1`
+3. Важно:
+   - remote path `/` запрещён
+   - используйте `~/` (home уже `public_html`)
+4. Запуск деплоя (Linux/macOS/WSL):
+   - `export BEGET_HOST=yaruvlnr.beget.tech`
+   - `export BEGET_USER=yaruvlnr_1234`
+   - `export BEGET_PORT=22`
+   - `export BEGET_REMOTE_PATH=~/`
+   - `export DRY_RUN=1` (опционально)
+   - `./scripts/deploy-beget.sh`
+5. Запуск деплоя (Windows PowerShell):
+   - `$env:BEGET_HOST="yaruvlnr.beget.tech"`
+   - `$env:BEGET_USER="yaruvlnr_1234"`
+   - `$env:BEGET_PORT="22"`
+   - `$env:BEGET_REMOTE_PATH="~/"`
+   - `$env:DRY_RUN="1"` (опционально)
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\deploy-beget.ps1`
+
+### Windows + MSYS2 rsync
+- Скрипт ищет `C:\msys64\usr\bin\rsync.exe` автоматически.
+- Либо добавьте `C:\msys64\usr\bin` в PATH.
+- Если rsync не найден, используйте WSL:
+  - `wsl rsync -avz --delete --exclude 'config.local.php' --exclude 'uploads/' --exclude '.ssh/' -e ssh -p 22 deploy/beget/public_html/ yaruvlnr_1234@yaruvlnr.beget.tech:~/`
