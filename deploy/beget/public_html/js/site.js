@@ -1488,6 +1488,7 @@ const setupStoriesSwipe = () => {
   let startY = 0;
   let swiping = false;
   let directionLocked = false;
+  let captured = false;
   const disableSlickSwipe = () => {
     $list.slick("slickSetOption", "swipe", false, true);
     $list.slick("slickSetOption", "touchMove", false, true);
@@ -1500,7 +1501,9 @@ const setupStoriesSwipe = () => {
   const resetSwipe = () => {
     if (pointerId !== null) {
       try {
-        viewport.releasePointerCapture(pointerId);
+        if (captured) {
+          viewport.releasePointerCapture(pointerId);
+        }
       } catch (error) {
         // Ignore capture release errors.
       }
@@ -1511,6 +1514,7 @@ const setupStoriesSwipe = () => {
     startY = 0;
     swiping = false;
     directionLocked = false;
+    captured = false;
   };
 
   viewport.addEventListener("pointerdown", (event) => {
@@ -1520,8 +1524,7 @@ const setupStoriesSwipe = () => {
     startY = event.clientY;
     swiping = false;
     directionLocked = false;
-    disableSlickSwipe();
-    viewport.setPointerCapture(pointerId);
+    captured = false;
   });
 
   viewport.addEventListener("pointermove", (event) => {
@@ -1534,6 +1537,11 @@ const setupStoriesSwipe = () => {
       swiping = Math.abs(deltaX) > Math.abs(deltaY);
     }
     if (!swiping) return;
+    if (!captured) {
+      disableSlickSwipe();
+      viewport.setPointerCapture(pointerId);
+      captured = true;
+    }
     event.preventDefault();
   });
 
