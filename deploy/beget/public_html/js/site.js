@@ -1143,11 +1143,6 @@ const applyStories3DClasses = () => {
   if (current) current.classList.add("is-center");
   mark(-1, "is-prev");
   mark(1, "is-next");
-};current.classList.add("is-current");
-  mark(-1, "is-prev");
-  mark(1, "is-next");
-  mark(-2, "is-prev2");
-  mark(2, "is-next2");
 };
 
 const setupStoriesInteractions = () => {
