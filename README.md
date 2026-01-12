@@ -57,3 +57,16 @@
 - Либо добавьте `C:\msys64\usr\bin` в PATH.
 - Если rsync не найден, используйте WSL:
   - `wsl rsync -avz --delete --exclude 'config.local.php' --exclude 'uploads/' --exclude '.ssh/' -e ssh -p 22 deploy/beget/public_html/ yaruvlnr_1234@yaruvlnr.beget.tech:~/`
+
+## Deploy via WinSCP (Windows)
+1. Установите WinSCP (нужен WinSCP.com в PATH).
+2. Создайте `deploy/beget/public_html/api/config.local.php` на сервере (в репо не хранится).
+3. Примеры переменных окружения:
+   - `BEGET_HOST=yaruvlnr.beget.tech`
+   - `BEGET_USER=yaruvlnr_1234`
+   - `BEGET_REMOTE_PATH=/`
+   - `BEGET_PRIVATE_KEY=%USERPROFILE%\.ssh\id_ed25519`
+   - `BEGET_HOSTKEY=""` (опционально, для фиксации host key)
+   - `DRY_RUN=1` (опционально)
+4. Запуск:
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\deploy-beget-winscp.ps1`
