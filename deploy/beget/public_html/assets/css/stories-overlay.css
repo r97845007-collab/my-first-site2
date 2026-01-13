@@ -2,10 +2,12 @@
   display: flex;
   gap: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 8px 0 12px;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  touch-action: pan-x pan-y;
 }
 
 .stories__list--strip::-webkit-scrollbar {
@@ -29,11 +31,16 @@
   height: 72px;
   border-radius: 50%;
   overflow: hidden;
+  position: relative;
   border: 2px solid rgba(124, 58, 237, 0.5);
   display: grid;
   place-items: center;
   background: rgba(124, 58, 237, 0.12);
   line-height: 0;
+}
+
+.story-thumb__media > * {
+  pointer-events: none;
 }
 
 .story-thumb__media img {
@@ -51,12 +58,19 @@
 }
 
 .story-thumb__caption {
+  display: block;
   font-size: 0.8rem;
   font-weight: 600;
   max-width: 92px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.stories__list--strip .story-card__caption,
+.stories__list--strip .story-card__meta,
+.stories__list--strip .hint {
+  display: none;
 }
 
 .stories-overlay {
