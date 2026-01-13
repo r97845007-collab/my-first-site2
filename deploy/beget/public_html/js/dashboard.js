@@ -31,6 +31,90 @@ const calendarForm = document.getElementById("calendar-form");
 const MAX_VIDEO_MB = 50;
 const RECOMMENDED_VIDEO_SECONDS = 60;
 const LONG_VIDEO_SECONDS = 180;
+const VIDEO_THUMB_SIZE = 256;
+
+let storyThumbBlob = null;
+let storyThumbPreview = null;
+
+const extractVideoThumb = async (file, opts = {}) => {
+  const timeoutMs = opts.timeoutMs || 35000;
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+    const url = URL.createObjectURL(file);
+    let timeoutId = null;
+
+    const cleanup = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      URL.revokeObjectURL(url);
+    };
+
+    timeoutId = setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, timeoutMs);
+
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      const target = Math.min(0.3, Math.max(0.1, duration * 0.1));
+      try {
+        video.currentTime = target;
+      } catch (error) {
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = VIDEO_THUMB_SIZE;
+        canvas.height = VIDEO_THUMB_SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          cleanup();
+          resolve(null);
+          return;
+        }
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+        if (!w || !h) {
+          cleanup();
+          resolve(null);
+          return;
+        }
+        const side = Math.min(w, h);
+        const sx = (w - side) / 2;
+        const sy = (h - side) / 2;
+        ctx.drawImage(video, sx, sy, side, side, 0, 0, VIDEO_THUMB_SIZE, VIDEO_THUMB_SIZE);
+        canvas.toBlob(
+          (blob) => {
+            cleanup();
+            if (!blob) {
+              resolve(null);
+              return;
+            }
+            resolve({ blob, width: w, height: h, time: video.currentTime });
+          },
+          "image/jpeg",
+          0.82
+        );
+      } catch (error) {
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    video.onerror = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    video.src = url;
+  });
+};
 
 const setupStoryMediaValidation = () => {
   if (!storyForm) return;
@@ -39,6 +123,11 @@ const setupStoryMediaValidation = () => {
   const status = document.createElement("div");
   status.className = "hint";
   input.parentElement.appendChild(status);
+
+  storyThumbPreview = document.createElement("img");
+  storyThumbPreview.className = "admin-thumb";
+  storyThumbPreview.style.display = "none";
+  input.parentElement.appendChild(storyThumbPreview);
 
   const resetStatus = () => {
     status.textContent = "";
@@ -58,6 +147,11 @@ const setupStoryMediaValidation = () => {
 
   input.addEventListener("change", () => {
     resetStatus();
+    storyThumbBlob = null;
+    if (storyThumbPreview) {
+      storyThumbPreview.src = "";
+      storyThumbPreview.style.display = "none";
+    }
     const file = input.files?.[0];
     if (!file) return;
 
@@ -92,6 +186,15 @@ const setupStoryMediaValidation = () => {
         }
         setStatus(`Duration: ${duration}s.`, "");
       };
+
+      extractVideoThumb(file).then((result) => {
+        if (!result?.blob) return;
+        storyThumbBlob = result.blob;
+        if (storyThumbPreview) {
+          storyThumbPreview.src = URL.createObjectURL(result.blob);
+          storyThumbPreview.style.display = "block";
+        }
+      });
     }
   });
 };
@@ -243,6 +346,9 @@ const handleStorySubmit = async (event) => {
   event.preventDefault();
   try {
     const data = new FormData(storyForm);
+    if (storyThumbBlob) {
+      data.append("video_thumb", storyThumbBlob, "thumb.jpg");
+    }
     const response = await fetch("/api/admin-stories.php", {
       method: "POST",
       credentials: "include",
@@ -253,6 +359,11 @@ const handleStorySubmit = async (event) => {
       throw new Error(payload.error || "Ошибка сохранения воспоминания");
     }
     storyForm.reset();
+    storyThumbBlob = null;
+    if (storyThumbPreview) {
+      storyThumbPreview.src = "";
+      storyThumbPreview.style.display = "none";
+    }
     await loadStories();
   } catch (error) {
     alert(error.message);

@@ -50,6 +50,7 @@ if ($method === 'POST') {
     }
 
     $mediaId = null;
+    $thumbFileId = null;
     if (!$isJson && !empty($_FILES['media']) && is_uploaded_file($_FILES['media']['tmp_name'])) {
         $tmp = $_FILES['media']['tmp_name'];
         $mime = mime_content_type($tmp) ?: '';
@@ -72,6 +73,31 @@ if ($method === 'POST') {
             'INSERT INTO media (id, telegram_file_id, kind) VALUES (?, ?, ?)',
             [$mediaId, $fileId, $kind]
         );
+
+        if (
+            $kind === 'video' &&
+            !empty($_FILES['video_thumb']) &&
+            is_uploaded_file($_FILES['video_thumb']['tmp_name'])
+        ) {
+            $thumbTmp = $_FILES['video_thumb']['tmp_name'];
+            $thumbSize = (int)($_FILES['video_thumb']['size'] ?? 0);
+            $thumbMime = mime_content_type($thumbTmp) ?: '';
+            $allowedThumbs = ['image/jpeg', 'image/png', 'image/webp'];
+            $maxThumbBytes = 2 * 1024 * 1024;
+            if (in_array($thumbMime, $allowedThumbs, true) && $thumbSize <= $maxThumbBytes) {
+                $thumbFileId = telegram_send_media('photo', $thumbTmp);
+            }
+        }
+    }
+
+    if ($mediaId && $thumbFileId) {
+        $hasPoster = db_query("SHOW COLUMNS FROM media LIKE 'poster_file_id'");
+        $hasThumb = db_query("SHOW COLUMNS FROM media LIKE 'thumb_file_id'");
+        if ($hasPoster) {
+            db_exec('UPDATE media SET poster_file_id = ? WHERE id = ?', [$thumbFileId, $mediaId]);
+        } elseif ($hasThumb) {
+            db_exec('UPDATE media SET thumb_file_id = ? WHERE id = ?', [$thumbFileId, $mediaId]);
+        }
     }
 
     $storyId = db_exec(
