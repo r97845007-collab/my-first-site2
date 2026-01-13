@@ -5,6 +5,7 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $isPublic = ($_GET['public'] ?? '') === '1';
 
 if ($method === 'GET') {
+    db_exec('DELETE FROM availability WHERE date <= CURDATE()');
     if ($isPublic) {
         $date = trim((string)($_GET['date'] ?? ''));
         $from = trim((string)($_GET['from'] ?? ''));

@@ -66,8 +66,9 @@ if ($method === 'GET') {
         $where = $publishedOnly ? "AND p.is_published = 1" : '';
         $rows = db_query(
             "SELECT p.id, p.type, p.title, p.body AS text, p.route_tag, p.duration_label, p.level_label, p.hashtags, p.funnel_stage, p.media_id,
-                    p.is_published, p.created_at
+                    p.is_published, p.created_at, m.kind AS media_kind
              FROM posts p
+             LEFT JOIN media m ON p.media_id = m.id
              WHERE p.type = 'memory' {$where}
              ORDER BY p.created_at DESC"
         );
@@ -107,9 +108,10 @@ if ($method === 'GET') {
             foreach ($rows as &$row) {
                 $mediaList = $mediaByStory[$row['id']] ?? [];
                 if (!$mediaList && !empty($row['media_id'])) {
+                    $mediaType = ($row['media_kind'] ?? '') === 'video' ? 'video' : 'image';
                     $mediaList[] = [
                         'media_id' => $row['media_id'],
-                        'media_type' => 'image',
+                        'media_type' => $mediaType,
                         'media_url' => '/api/media.php?id=' . $row['media_id'],
                         'thumb_url' => '/api/media.php?id=' . $row['media_id'] . '&thumb=256',
                     ];
@@ -125,10 +127,11 @@ if ($method === 'GET') {
 
         foreach ($rows as &$row) {
             $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
+            $mediaType = ($row['media_kind'] ?? '') === 'video' ? 'video' : 'image';
             $row['media'] = $row['media_url']
                 ? [[
                     'media_id' => $row['media_id'],
-                    'media_type' => 'image',
+                    'media_type' => $mediaType,
                     'media_url' => $row['media_url'],
                     'thumb_url' => '/api/media.php?id=' . $row['media_id'] . '&thumb=256',
                 ]]

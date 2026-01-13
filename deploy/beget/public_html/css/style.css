@@ -611,6 +611,18 @@ section {
   overflow: hidden;
 }
 
+.media-count {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .media.is-clickable {
   cursor: pointer;
 }
@@ -792,6 +804,7 @@ td {
   flex-direction: column;
   gap: 6px;
   background: var(--bg-card);
+  cursor: pointer;
 }
 
 .calendar-cell button {
@@ -804,6 +817,7 @@ td {
 
 .calendar-cell.is-disabled {
   opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .calendar-cell.is-disabled button {
@@ -818,6 +832,11 @@ td {
 .calendar-cell__meta {
   font-size: 0.7rem;
   color: var(--muted);
+}
+
+.calendar-cell.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
 }
 
 .calendar-day {
@@ -1318,6 +1337,53 @@ td {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.reels-overlay__media-nav {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.reels-overlay__media-tap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  border: none;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: pan-y;
+}
+
+.reels-overlay__media-tap--left {
+  left: 0;
+}
+
+.reels-overlay__media-tap--right {
+  right: 0;
+}
+
+.reels-overlay__media-dots {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.reels-overlay__media-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.reels-overlay__media-dot.is-active {
+  background: #fff;
 }
 
 .reels-overlay__mute {

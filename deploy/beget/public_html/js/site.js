@@ -416,6 +416,27 @@ const resolveStoryMedia = (story) => {
   ];
 };
 
+const resolvePostMedia = (post) => {
+  if (Array.isArray(post?.media) && post.media.length) {
+    return post.media.map((media) => ({
+      media_url: media.media_url || "",
+      media_type: media.media_type || "",
+      thumb_url: media.thumb_url || media.poster_url || "",
+    }));
+  }
+  const mediaUrl = post.media_url || "";
+  if (!mediaUrl) return [];
+  const mediaType =
+    post.media_kind === "video" || post.media_kind === "telegram_video" || post.type === "reel" ? "video" : "image";
+  return [
+    {
+      media_url: mediaUrl,
+      media_type: mediaType,
+      thumb_url: buildMediaThumbUrl(mediaUrl),
+    },
+  ];
+};
+
 const renderStories = () => {
   destroyStoriesCarousel();
   elements.storiesList.classList.add("stories__list--fallback", "stories__list--strip");
@@ -608,22 +629,27 @@ const createPostCard = (post) => {
   const liked = feedFromApi ? Boolean(post.is_favorited) : Boolean(state.likes[post.id]);
   const saved = Boolean(state.saves[post.id]);
   const commentsCount = feedFromApi ? post.comments_count || 0 : (state.comments[post.id] || []).length;
-  const mediaKind = post.media_kind === "video" || post.media_kind === "telegram_video" ? "video" : "photo";
-  const mediaUrl = post.media_url || "";
-  const posterUrl = post.poster_url || post.poster || post.thumbnail_url || "";
+  const mediaList = resolvePostMedia(post);
+  const firstMedia = mediaList[0];
+  const mediaKind = firstMedia?.media_type === "video" ? "video" : "photo";
+  const mediaUrl = firstMedia?.media_url || "";
+  const posterUrl = firstMedia?.thumb_url || post.poster_url || post.poster || post.thumbnail_url || "";
   card.dataset.mediaUrl = mediaUrl;
   card.dataset.mediaType = mediaKind;
   card.dataset.posterUrl = posterUrl;
   card.dataset.caption = post.caption || "";
+  card.dataset.media = JSON.stringify(mediaList);
   const fallbackSrc = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
   const isReel = post.type === "reel" || post.media_kind === "telegram_video" || mediaKind === "video";
+  const mediaCount = mediaList.length;
+  const previewSrc =
+    mediaKind === "video"
+      ? posterUrl || fallbackSrc
+      : firstMedia?.thumb_url || mediaUrl || fallbackSrc;
   card.innerHTML = `
     <div class="media ${isReel ? "reel" : ""}">
-      ${
-        mediaUrl && mediaKind === "video"
-          ? `<video src="${mediaUrl}" playsinline controls preload="metadata"></video>`
-          : `<img src="${mediaUrl || fallbackSrc}" alt="${isReel ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />`
-      }
+      <img src="${previewSrc}" alt="${isReel ? "Рилс" : "Фото"}: ${post.caption}" loading="lazy" />
+      ${mediaCount > 1 ? `<span class="media-count">1/${mediaCount}</span>` : ""}
       ${
         isReel && !mediaUrl
           ? `<div class="reel-overlay" aria-hidden="true">
@@ -759,9 +785,24 @@ const buildItemsFromFeedDOM = () => {
     .map((card) => {
       const postId = card.dataset.postId;
       const post = postsData.find((entry) => String(entry.id) === String(postId)) || {};
-      const mediaUrl = card.dataset.mediaUrl || post.media_url || "";
-      const mediaType = card.dataset.mediaType || post.media_kind || (post.type === "reel" ? "video" : "photo");
-      const posterUrl = card.dataset.posterUrl || post.poster_url || post.poster || post.thumbnail_url || "";
+      let mediaList = [];
+      if (card.dataset.media) {
+        try {
+          const parsed = JSON.parse(card.dataset.media);
+          if (Array.isArray(parsed)) {
+            mediaList = parsed;
+          }
+        } catch (error) {
+          mediaList = [];
+        }
+      }
+      if (!mediaList.length) {
+        mediaList = resolvePostMedia(post);
+      }
+      const first = mediaList[0] || {};
+      const mediaUrl = first.media_url || card.dataset.mediaUrl || post.media_url || "";
+      const mediaType = first.media_type || card.dataset.mediaType || post.media_kind || (post.type === "reel" ? "video" : "photo");
+      const posterUrl = first.thumb_url || card.dataset.posterUrl || post.poster_url || post.poster || post.thumbnail_url || "";
       const caption = card.dataset.caption || post.caption || "";
       return {
         ...post,
@@ -769,6 +810,7 @@ const buildItemsFromFeedDOM = () => {
         media_url: mediaUrl,
         media_kind: mediaType,
         poster_url: posterUrl,
+        media: mediaList,
         caption,
       };
     })
@@ -809,6 +851,16 @@ const createReelsOverlay = () => {
   reelsOverlay.querySelector(".reels-overlay__nav--next")?.addEventListener("click", () => scrollReelsBy(1));
 
   reelsTrack.addEventListener("click", (event) => {
+    const mediaButton = event.target.closest("[data-reels-media]");
+    if (mediaButton) {
+      const item = mediaButton.closest(".reels-overlay__item");
+      if (!item) return;
+      const post = reelsPosts.find((entry) => String(entry.id) === String(item.dataset.postId));
+      if (!post) return;
+      const direction = mediaButton.dataset.reelsMedia === "next" ? 1 : -1;
+      shiftReelsMedia(post, direction);
+      return;
+    }
     const actionButton = event.target.closest("[data-reels-action]");
     if (!actionButton) return;
     const item = actionButton.closest(".reels-overlay__item");
@@ -884,9 +936,9 @@ const setReelsTimeout = (mediaEl, onTimeout) => {
   reelsMediaTimeouts.set(mediaEl, timer);
 };
 
-const showReelsFallback = (mediaEl, post, mediaKind, reason, retry) => {
+const showReelsFallback = (mediaEl, post, mediaItem, mediaKind, reason, retry) => {
   const fallback = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
-  const poster = post.poster_url || post.poster || post.thumbnail_url || fallback;
+  const poster = mediaItem?.thumb_url || post.poster_url || post.poster || post.thumbnail_url || fallback;
   mediaEl.innerHTML = `
     <div class="reels-overlay__fallback">
       <img src="${poster}" alt="${post.caption || "Медиа"}" loading="lazy" />
@@ -899,14 +951,13 @@ const showReelsFallback = (mediaEl, post, mediaKind, reason, retry) => {
   retryButton?.addEventListener("click", () => retry(mediaEl));
 };
 
-const renderReelsMedia = (mediaEl, post, shouldLoad, isActive) => {
-  const mediaUrl = post.media_url || "";
-  const mediaKind =
-    post.media_kind === "video" || post.media_kind === "telegram_video" || post.type === "reel" ? "video" : "photo";
-  const poster = post.poster_url || post.poster || post.thumbnail_url || "";
+const renderReelsMedia = (mediaEl, post, mediaItem, shouldLoad, isActive) => {
+  const mediaUrl = mediaItem?.media_url || "";
+  const mediaKind = mediaItem?.media_type || "photo";
   const fallback = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
+  const thumbUrl = mediaItem?.thumb_url || "";
   const targetSrc = mediaKind === "photo" ? mediaUrl || fallback : mediaUrl;
-  const targetPoster = poster || fallback;
+  const targetPoster = thumbUrl || fallback;
 
   if (!shouldLoad) {
     mediaEl.dataset.loaded = "0";
@@ -930,17 +981,17 @@ const renderReelsMedia = (mediaEl, post, shouldLoad, isActive) => {
   `;
 
   const handleTimeout = () => {
-    showReelsFallback(mediaEl, post, mediaKind, "timeout", (el) => {
-      const bust = `v=${Date.now()}`;
-      if (mediaKind === "photo") {
-        const retryUrl = targetSrc ? `${targetSrc}${targetSrc.includes("?") ? "&" : "?"}${bust}` : targetPoster;
-        loadReelsImage(el, post, retryUrl, true);
-      } else {
-        const retryUrl = mediaUrl ? `${mediaUrl}${mediaUrl.includes("?") ? "&" : "?"}${bust}` : "";
-        loadReelsVideo(el, post, retryUrl, true);
-      }
-    });
-  };
+      showReelsFallback(mediaEl, post, mediaItem, mediaKind, "timeout", (el) => {
+        const bust = `v=${Date.now()}`;
+        if (mediaKind === "photo") {
+          const retryUrl = targetSrc ? `${targetSrc}${targetSrc.includes("?") ? "&" : "?"}${bust}` : targetPoster;
+          loadReelsImage(el, post, retryUrl, true);
+        } else {
+          const retryUrl = mediaUrl ? `${mediaUrl}${mediaUrl.includes("?") ? "&" : "?"}${bust}` : "";
+          loadReelsVideo(el, post, retryUrl, true);
+        }
+      });
+    };
 
   setReelsTimeout(mediaEl, handleTimeout);
 
@@ -958,7 +1009,7 @@ const renderReelsMedia = (mediaEl, post, shouldLoad, isActive) => {
     };
     img.onerror = () => {
       clearReelsTimeout(el);
-      showReelsFallback(el, postData, "photo", "error", (target) => loadReelsImage(target, postData, src, true));
+      showReelsFallback(el, postData, mediaItem, "photo", "error", (target) => loadReelsImage(target, postData, src, true));
     };
     img.src = src || targetPoster;
   };
@@ -966,7 +1017,7 @@ const renderReelsMedia = (mediaEl, post, shouldLoad, isActive) => {
   const loadReelsVideo = (el, postData, src, eager) => {
     if (!src) {
       clearReelsTimeout(el);
-      showReelsFallback(el, postData, "video", "no-src", (target) => loadReelsVideo(target, postData, src, true));
+      showReelsFallback(el, postData, mediaItem, "video", "no-src", (target) => loadReelsVideo(target, postData, src, true));
       return;
     }
     const video = document.createElement("video");
@@ -989,7 +1040,7 @@ const renderReelsMedia = (mediaEl, post, shouldLoad, isActive) => {
     });
     video.addEventListener("error", () => {
       clearReelsTimeout(el);
-      showReelsFallback(el, postData, "video", "error", (target) => loadReelsVideo(target, postData, src, true));
+      showReelsFallback(el, postData, mediaItem, "video", "error", (target) => loadReelsVideo(target, postData, src, true));
     });
     setVideoSource(video, src);
     video.load();
@@ -997,7 +1048,9 @@ const renderReelsMedia = (mediaEl, post, shouldLoad, isActive) => {
 
   if (mediaKind === "photo") {
     if (!targetSrc) {
-      showReelsFallback(mediaEl, post, mediaKind, "no-src", (target) => loadReelsImage(target, post, targetPoster, true));
+      showReelsFallback(mediaEl, post, mediaItem, mediaKind, "no-src", (target) =>
+        loadReelsImage(target, post, targetPoster, true)
+      );
       return;
     }
     loadReelsImage(mediaEl, post, targetSrc, isActive);
@@ -1018,7 +1071,11 @@ const updateReelsWindow = () => {
     const media = item.querySelector(".reels-overlay__media");
     if (!media) return;
     const shouldLoad = Math.abs(index - reelsActiveIndex) <= REELS_WINDOW;
-    renderReelsMedia(media, post, shouldLoad, index === reelsActiveIndex);
+    const mediaList = Array.isArray(post.media) && post.media.length ? post.media : resolvePostMedia(post);
+    post.media = mediaList;
+    if (post.activeMediaIndex === undefined) post.activeMediaIndex = 0;
+    const currentMedia = mediaList[post.activeMediaIndex] || mediaList[0];
+    renderReelsMedia(media, post, currentMedia, shouldLoad, index === reelsActiveIndex);
   });
 };
 
@@ -1039,6 +1096,38 @@ const updateReelsButtons = () => {
   });
 };
 
+const updateReelsMediaDots = (post) => {
+  if (!reelsTrack) return;
+  const item = reelsTrack.querySelector(`[data-post-id="${post.id}"]`);
+  if (!item) return;
+  const dots = item.querySelector(".reels-overlay__media-dots");
+  if (!dots) return;
+  const mediaList = Array.isArray(post.media) && post.media.length ? post.media : resolvePostMedia(post);
+  post.media = mediaList;
+  const activeIndex = post.activeMediaIndex || 0;
+  dots.innerHTML = "";
+  mediaList.forEach((_, index) => {
+    const dot = document.createElement("span");
+    dot.className = "reels-overlay__media-dot";
+    if (index === activeIndex) dot.classList.add("is-active");
+    dots.appendChild(dot);
+  });
+};
+
+const shiftReelsMedia = (post, direction) => {
+  const mediaList = Array.isArray(post.media) && post.media.length ? post.media : resolvePostMedia(post);
+  post.media = mediaList;
+  const current = Number.isFinite(post.activeMediaIndex) ? post.activeMediaIndex : 0;
+  const next = current + direction;
+  if (next >= 0 && next < mediaList.length) {
+    post.activeMediaIndex = next;
+    updateReelsWindow();
+    updateReelsMediaDots(post);
+    return;
+  }
+  scrollReelsBy(direction);
+};
+
 const setActiveReelsIndex = (index) => {
   reelsActiveIndex = Math.max(0, Math.min(index, reelsPosts.length - 1));
   updateReelsWindow();
@@ -1055,6 +1144,8 @@ const setActiveReelsIndex = (index) => {
     }
   });
   updateReelsButtons();
+  const active = reelsPosts[reelsActiveIndex];
+  if (active) updateReelsMediaDots(active);
 };
 
 const scrollReelsBy = (direction) => {
@@ -1067,6 +1158,8 @@ const buildReelsItems = () => {
   if (!reelsTrack) return;
   reelsTrack.innerHTML = "";
   reelsPosts.forEach((post, index) => {
+    post.media = Array.isArray(post.media) && post.media.length ? post.media : resolvePostMedia(post);
+    if (!Number.isFinite(post.activeMediaIndex)) post.activeMediaIndex = 0;
     const item = document.createElement("section");
     item.className = "reels-overlay__item";
     item.dataset.index = String(index);
@@ -1077,6 +1170,11 @@ const buildReelsItems = () => {
     item.innerHTML = `
       <div class="reels-overlay__card">
         <div class="reels-overlay__media"></div>
+        <div class="reels-overlay__media-nav">
+          <button class="reels-overlay__media-tap reels-overlay__media-tap--left" type="button" data-reels-media="prev" aria-label="Предыдущее медиа"></button>
+          <div class="reels-overlay__media-dots"></div>
+          <button class="reels-overlay__media-tap reels-overlay__media-tap--right" type="button" data-reels-media="next" aria-label="Следующее медиа"></button>
+        </div>
         <button class="reels-overlay__mute" type="button" aria-label="Звук">${reelsMuted ? "🔇" : "🔊"}</button>
         <div class="reels-overlay__actions">
           <button class="reels-overlay__action" data-reels-action="like" type="button" aria-label="Лайк">♡</button>
@@ -1365,7 +1463,10 @@ const renderCalendar = () => {
     const availableCount = dateSlots.filter((slot) => slot.is_available).length;
     const hasAvailable = availableCount > 0;
     const cell = document.createElement("div");
-    cell.className = `calendar-cell ${hasAvailable ? "" : "is-disabled"}`;
+    cell.className = `calendar-cell ${hasAvailable ? "" : "is-disabled"} ${
+      state.selectedDate === dateString ? "is-active" : ""
+    }`;
+    cell.dataset.date = dateString;
     const meta = availableCount
       ? `${availableCount} слота`
       : dateSlots.length
@@ -1379,16 +1480,28 @@ const renderCalendar = () => {
     if (!hasAvailable) {
       button.disabled = true;
     }
-    button.addEventListener("click", () => {
-      if (!hasAvailable) return;
-      state.selectedDate = dateString;
-      syncSelectedSlot();
-      saveState();
-      renderCalendarDay();
-      renderWizardSlots();
-    });
     elements.calendarGrid.appendChild(cell);
   }
+};
+
+const setupCalendarCellClick = () => {
+  if (!elements.calendarGrid) return;
+  elements.calendarGrid.addEventListener("click", (event) => {
+    const cell = event.target.closest(".calendar-cell");
+    if (!cell || cell.classList.contains("is-empty")) return;
+    if (cell.classList.contains("is-disabled")) return;
+    const date = cell.dataset.date;
+    if (!date) return;
+    state.selectedDate = date;
+    syncSelectedSlot();
+    saveState();
+    renderCalendar();
+    renderCalendarDay();
+    renderWizardSlots();
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      elements.calendarSlots?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
 };
 
 const renderWizardRoutes = () => {
@@ -2172,6 +2285,7 @@ const init = async () => {
   setupFavorites();
   setupReelsOverlay();
   setupCalendarNavigation();
+  setupCalendarCellClick();
   setupWizard();
   setupForm();
   setupReviewForm();

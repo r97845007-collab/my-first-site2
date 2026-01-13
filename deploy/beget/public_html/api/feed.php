@@ -3,6 +3,16 @@ require_once __DIR__ . '/bootstrap.php';
 
 requireMethod('GET');
 
+$hasPostMediaTable = null;
+$postMediaTableExists = function () use (&$hasPostMediaTable): bool {
+    if ($hasPostMediaTable !== null) {
+        return $hasPostMediaTable;
+    }
+    $rows = db_query("SHOW TABLES LIKE 'post_media'");
+    $hasPostMediaTable = !empty($rows);
+    return $hasPostMediaTable;
+};
+
 $limit = (int)($_GET['limit'] ?? 6);
 if ($limit < 1) {
     $limit = 6;
@@ -70,11 +80,69 @@ if ($sort === 'popular') {
 $sql .= ' LIMIT ' . $limit;
 
 $rows = db_query($sql, $params);
-foreach ($rows as &$row) {
-    $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
-    $row['is_favorited'] = (bool) $row['is_favorited'];
-    $row['favorites_count'] = (int) $row['favorites_count'];
-    $row['comments_count'] = (int) $row['comments_count'];
+if ($rows) {
+    if ($postMediaTableExists()) {
+        $postIds = array_map(fn ($row) => (int) $row['id'], $rows);
+        $placeholders = implode(',', array_fill(0, count($postIds), '?'));
+        $mediaRows = db_query(
+            "SELECT pm.post_id, pm.media_id, pm.kind, pm.thumb_media_id, pm.sort_order,
+                    m.kind AS media_kind
+             FROM post_media pm
+             LEFT JOIN media m ON pm.media_id = m.id
+             WHERE pm.post_id IN ({$placeholders})
+             ORDER BY pm.sort_order ASC, pm.id ASC",
+            $postIds
+        );
+        $mediaByPost = [];
+        foreach ($mediaRows as $media) {
+            $mediaId = $media['media_id'];
+            $thumbId = $media['thumb_media_id'] ?? null;
+            $kind = $media['kind'] ?: ($media['media_kind'] ?? 'photo');
+            $mediaType = $kind === 'video' ? 'video' : 'image';
+            $thumbUrl = $thumbId
+                ? '/api/media.php?id=' . $thumbId . '&thumb=256'
+                : '/api/media.php?id=' . $mediaId . '&thumb=256';
+            $mediaByPost[$media['post_id']][] = [
+                'media_id' => $mediaId,
+                'media_type' => $mediaType,
+                'media_url' => $mediaId ? '/api/media.php?id=' . $mediaId : null,
+                'thumb_url' => $thumbUrl,
+            ];
+        }
+        foreach ($rows as &$row) {
+            $mediaList = $mediaByPost[$row['id']] ?? [];
+            if (!$mediaList && !empty($row['media_id'])) {
+                $mediaType = ($row['media_kind'] ?? '') === 'video' ? 'video' : 'image';
+                $mediaList[] = [
+                    'media_id' => $row['media_id'],
+                    'media_type' => $mediaType,
+                    'media_url' => '/api/media.php?id=' . $row['media_id'],
+                    'thumb_url' => '/api/media.php?id=' . $row['media_id'] . '&thumb=256',
+                ];
+            }
+            $row['media'] = $mediaList;
+            $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
+            $row['is_favorited'] = (bool) $row['is_favorited'];
+            $row['favorites_count'] = (int) $row['favorites_count'];
+            $row['comments_count'] = (int) $row['comments_count'];
+        }
+    } else {
+        foreach ($rows as &$row) {
+            $row['media_url'] = $row['media_id'] ? '/api/media.php?id=' . $row['media_id'] : null;
+            $mediaType = ($row['media_kind'] ?? '') === 'video' ? 'video' : 'image';
+            $row['media'] = $row['media_url']
+                ? [[
+                    'media_id' => $row['media_id'],
+                    'media_type' => $mediaType,
+                    'media_url' => $row['media_url'],
+                    'thumb_url' => '/api/media.php?id=' . $row['media_id'] . '&thumb=256',
+                ]]
+                : [];
+            $row['is_favorited'] = (bool) $row['is_favorited'];
+            $row['favorites_count'] = (int) $row['favorites_count'];
+            $row['comments_count'] = (int) $row['comments_count'];
+        }
+    }
 }
 
 $nextCursor = null;
