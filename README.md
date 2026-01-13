@@ -1,31 +1,87 @@
-# Конная кавалерия — деплой на Beget
+# РљРѕРЅРЅР°СЏ РєР°РІР°Р»РµСЂРёСЏ вЂ” РґРµРїР»РѕР№ РЅР° Beget
 
-## Структура проекта
-- `deploy/beget/public_html` — рабочая директория деплоя, копируется в `public_html` на Beget.
-- Внутри `public_html`: `api/`, `assets/`, `css/`, `js/`, `lib/`, `vendor/` + `.htaccess`, `index.html`, `login.html`, `register.html`, `dashboard.html`, `favicon.svg`.
+## РЎС‚СЂСѓРєС‚СѓСЂР° РїСЂРѕРµРєС‚Р°
+- `deploy/beget/public_html` вЂ” СЂР°Р±РѕС‡Р°СЏ РґРёСЂРµРєС‚РѕСЂРёСЏ РґРµРїР»РѕСЏ, РєРѕРїРёСЂСѓРµС‚СЃСЏ РІ `public_html` РЅР° Beget.
+- Р’РЅСѓС‚СЂРё `public_html`: `api/`, `assets/`, `css/`, `js/`, `lib/`, `vendor/` + `.htaccess`, `index.html`, `login.html`, `register.html`, `dashboard.html`, `favicon.svg`.
 
-## Конфиг и база
-- Боевой конфиг лежит в `deploy/beget/public_html/api/config.local.php` (в git не хранится).
-- Пример структуры см. `deploy/beget/public_html/api/config.example.php`.
-- Схему БД импортируйте перед запуском (MySQL). Таблицы: `users`, `media`, `posts`, `reviews`, `review_media`, `availability`, `user_telegram`, `comments`, `favorites`.
+## РљРѕРЅС„РёРі Рё Р±Р°Р·Р°
+- Р‘РѕРµРІРѕР№ РєРѕРЅС„РёРі Р»РµР¶РёС‚ РІ `deploy/beget/public_html/api/config.local.php` (РІ git РЅРµ С…СЂР°РЅРёС‚СЃСЏ).
+- РџСЂРёРјРµСЂ СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃРј. `deploy/beget/public_html/api/config.example.php`.
+- РЎС…РµРјСѓ Р‘Р” РёРјРїРѕСЂС‚РёСЂСѓР№С‚Рµ РїРµСЂРµРґ Р·Р°РїСѓСЃРєРѕРј (MySQL). РўР°Р±Р»РёС†С‹: `users`, `media`, `posts`, `reviews`, `review_media`, `availability`, `user_telegram`, `comments`, `favorites`.
 
-## Как проверить
-1. Главная страница: лента, stories и рилсы грузятся из API.
-2. `/api/health.php` возвращает `ok: true` и список таблиц.
-3. Лента: `/api/feed.php`.
+## РљР°Рє РїСЂРѕРІРµСЂРёС‚СЊ
+1. Р“Р»Р°РІРЅР°СЏ СЃС‚СЂР°РЅРёС†Р°: Р»РµРЅС‚Р°, stories Рё СЂРёР»СЃС‹ РіСЂСѓР·СЏС‚СЃСЏ РёР· API.
+2. `/api/health.php` РІРѕР·РІСЂР°С‰Р°РµС‚ `ok: true` Рё СЃРїРёСЃРѕРє С‚Р°Р±Р»РёС†.
+3. Р›РµРЅС‚Р°: `/api/feed.php`.
 4. Stories: `/api/stories.php`.
-5. Календарь: `/api/admin-availability.php?public=1`.
-6. Отзывы: `/api/reviews.php` (берутся только `approved`).
+5. РљР°Р»РµРЅРґР°СЂСЊ: `/api/admin-availability.php?public=1`.
+6. РћС‚Р·С‹РІС‹: `/api/reviews.php` (Р±РµСЂСѓС‚СЃСЏ С‚РѕР»СЊРєРѕ `approved`).
 
-## Деплой на Beget
-1. Скопируйте содержимое `deploy/beget/public_html/` в `public_html` хостинга.
-2. Создайте `deploy/beget/public_html/api/config.local.php` на сервере.
-3. Проверьте права и работу API:
+## Р”РµРїР»РѕР№ РЅР° Beget
+1. РЎРєРѕРїРёСЂСѓР№С‚Рµ СЃРѕРґРµСЂР¶РёРјРѕРµ `deploy/beget/public_html/` РІ `public_html` С…РѕСЃС‚РёРЅРіР°.
+2. РЎРѕР·РґР°Р№С‚Рµ `deploy/beget/public_html/api/config.local.php` РЅР° СЃРµСЂРІРµСЂРµ.
+3. РџСЂРѕРІРµСЂСЊС‚Рµ РїСЂР°РІР° Рё СЂР°Р±РѕС‚Сѓ API:
    - `/api/health.php`
    - `/api/feed.php`
    - `/api/stories.php`
    - `/api/reviews.php`
 
-## Важно
-- `vendor/` — фронтенд-зависимости (jquery/slick). PHP-исполнение там запрещено через `.htaccess`.
-- Если появится `uploads/`, запретите выполнение PHP и листинг (как в корне).
+## Р’Р°Р¶РЅРѕ
+- `vendor/` вЂ” С„СЂРѕРЅС‚РµРЅРґ-Р·Р°РІРёСЃРёРјРѕСЃС‚Рё (jquery/slick). PHP-РёСЃРїРѕР»РЅРµРЅРёРµ С‚Р°Рј Р·Р°РїСЂРµС‰РµРЅРѕ С‡РµСЂРµР· `.htaccess`.
+- Р•СЃР»Рё РїРѕСЏРІРёС‚СЃСЏ `uploads/`, Р·Р°РїСЂРµС‚РёС‚Рµ РІС‹РїРѕР»РЅРµРЅРёРµ PHP Рё Р»РёСЃС‚РёРЅРі (РєР°Рє РІ РєРѕСЂРЅРµ).
+## Deploy to Beget (rsync РїРѕ SSH)
+1. РќР°СЃС‚СЂРѕР№С‚Рµ SSH-РєР»СЋС‡Рё:
+   - `ssh-keygen -t ed25519 -C "beget-deploy"`
+   - РґРѕР±Р°РІСЊС‚Рµ РїСѓР±Р»РёС‡РЅС‹Р№ РєР»СЋС‡ РІ Beget.
+2. РЎРѕР·РґР°Р№С‚Рµ `deploy/beget/public_html/api/config.local.php` РЅР° СЃРµСЂРІРµСЂРµ (РІ СЂРµРїРѕ РЅРµ С…СЂР°РЅРёС‚СЃСЏ).
+3. Р’Р°Р¶РЅРѕ:
+   - remote path `/` Р·Р°РїСЂРµС‰С‘РЅ
+   - РёСЃРїРѕР»СЊР·СѓР№С‚Рµ `~/` (home СѓР¶Рµ `public_html`)
+4. Р—Р°РїСѓСЃРє РґРµРїР»РѕСЏ (Linux/macOS/WSL):
+   - `export BEGET_HOST=.beget.tech`
+   - `export BEGET_USER=`
+   - `export BEGET_PORT=22`
+   - `export BEGET_REMOTE_PATH=~/`
+   - `export DRY_RUN=1` (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
+   - `./scripts/deploy-beget.sh`
+5. Р—Р°РїСѓСЃРє РґРµРїР»РѕСЏ (Windows PowerShell):
+   - `$env:BEGET_HOST=".beget.tech"`
+   - `$env:BEGET_USER="`
+   - `$env:BEGET_PORT="22"`
+   - `$env:BEGET_REMOTE_PATH="~/"`
+   - `$env:DRY_RUN="1"` (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\deploy-beget.ps1`
+
+### Windows + MSYS2 rsync
+- РЎРєСЂРёРїС‚ РёС‰РµС‚ `C:\msys64\usr\bin\rsync.exe` Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё.
+- Р›РёР±Рѕ РґРѕР±Р°РІСЊС‚Рµ `C:\msys64\usr\bin` РІ PATH.
+- Р•СЃР»Рё rsync РЅРµ РЅР°Р№РґРµРЅ, РёСЃРїРѕР»СЊР·СѓР№С‚Рµ WSL:
+  - `wsl rsync -avz --delete --exclude 'config.local.php' --exclude 'uploads/' --exclude '.ssh/' -e ssh -p 22 deploy/beget/public_html/ .beget.tech:~/`
+
+## Deploy via WinSCP (Windows)
+1. РЈСЃС‚Р°РЅРѕРІРёС‚Рµ WinSCP (РЅСѓР¶РµРЅ WinSCP.com РІ PATH).
+2. РЎРѕР·РґР°Р№С‚Рµ `deploy/beget/public_html/api/config.local.php` РЅР° СЃРµСЂРІРµСЂРµ (РІ СЂРµРїРѕ РЅРµ С…СЂР°РЅРёС‚СЃСЏ).
+3. РџСЂРёРјРµСЂС‹ РїРµСЂРµРјРµРЅРЅС‹С… РѕРєСЂСѓР¶РµРЅРёСЏ:
+   - `BEGET_HOST=.beget.tech`
+   - `BEGET_USER=`
+   - `BEGET_REMOTE_PATH=/`
+   - `BEGET_PRIVATE_KEY=%USERPROFILE%\.ssh\id_ed25519`
+   - `BEGET_HOSTKEY=""` (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ, РґР»СЏ С„РёРєСЃР°С†РёРё host key)
+   - `DRY_RUN=1` (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
+4. Р—Р°РїСѓСЃРє:
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\deploy-beget-winscp.ps1`
+## Deploy via WinSCP CLI (Windows)
+1. Set env vars in PowerShell:
+   - `$env:BEGET_HOST="yaruvlnr.beget.tech"`
+   - `$env:BEGET_USER="yaruvlnr_1234"`
+   - `$env:BEGET_PORT="22"`
+   - `$env:BEGET_REMOTE_PATH="~/"`
+   - `$env:BEGET_HOSTKEY="ssh-ed25519 255 SHA256:14hNJylDIrQMUKWN/Fz7Lq06hjnnyBmBCE9feqeK53M"`
+   - `$env:WINSCP_COM="C:\Program Files (x86)\WinSCP\WinSCP.com"`
+2. Run:
+   - `powershell -ExecutionPolicy Bypass -File .\scripts\deploy-beget-winscp-cli.ps1`
+
+
+## One-command deploy
+- powershell -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
+
