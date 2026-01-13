@@ -210,10 +210,33 @@ let topbarTransitioning = false;
 let topbarPending = null;
 let topbarUnlockTimer = null;
 let storiesSwipeBound = false;
-let reelActiveIndex = 0;
-let reelMuted = true;
-let reelPosts = [];
-const REEL_MAX_ITEMS = 24;
+const REELS_MAX_ITEMS = 24;
+const REELS_WINDOW = 1;
+const REELS_AUTO_KEY = "reelsAutoOpened";
+const REELS_MOBILE_MAX = 768;
+const REELS_VISIBILITY = 0.6;
+const REELS_LOAD_TIMEOUT = 8000;
+const REELS_DEBUG = Boolean(window.__DEV__) || new URLSearchParams(window.location.search).get("debug") === "1";
+let reelsActiveIndex = 0;
+let reelsMuted = true;
+let reelsPosts = [];
+let reelsOverlay = null;
+let reelsTrack = null;
+let reelsObserver = null;
+let reelsAutoObserver = null;
+let reelsScrollY = 0;
+let reelsHistoryActive = false;
+let reelsClosing = false;
+const reelsMediaTimeouts = new Map();
+
+const reelsLog = (event, data = {}) => {
+  if (!REELS_DEBUG) return;
+  try {
+    console.log("[reels]", event, data);
+  } catch (error) {
+    // Ignore logging errors.
+  }
+};
 
 let activeFilter = "all";
 let visibleCount = 6;
@@ -227,7 +250,6 @@ let feedHasMore = true;
 let feedLoading = false;
 let feedFromApi = false;
 let feedSentinel = null;
-let reelObserver = null;
 
 const saveState = () => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -367,7 +389,7 @@ const destroyStoriesCarousel = () => {
 
 const renderStories = () => {
   destroyStoriesCarousel();
-  elements.storiesList.classList.add("stories__list--fallback");
+  elements.storiesList.classList.add("stories__list--fallback", "stories__list--strip");
   elements.storiesList.innerHTML = "";
   storiesData.forEach((story) => {
     const title = story.title || "Воспоминание";
@@ -378,31 +400,25 @@ const renderStories = () => {
         ? "video"
         : "photo";
     const poster = story.poster_url || story.poster || story.thumbnail_url || "";
-    const posterAttr = poster ? ' poster="' + poster + '"' : "";
     const fallbackImage = ASSETS.story;
-    const mediaSrc = mediaUrl || fallbackImage;
     const isVideo = mediaKind === "video";
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "story-card stories__item";
+    card.className = "story-thumb stories__item";
     card.dataset.storyId = story.id;
     card.dataset.mediaType = isVideo ? "video" : "photo";
     card.dataset.mediaSrc = mediaUrl;
+    card.dataset.poster = poster;
+    card.dataset.title = title;
+    card.dataset.subtitle = subtitle;
     card.innerHTML = `
-      <span class="story-card__media">
-        ${
-          isVideo && mediaUrl
-            ? `<video src="${mediaUrl}"${posterAttr} muted playsinline preload="metadata"></video>`
-            : `<img src="${mediaSrc}" alt="Воспоминание ${title}" loading="lazy" />`
-        }
-        ${isVideo ? `<span class="story-card__play" aria-hidden="true">&#9658;</span>` : ""}
+      <span class="story-thumb__media">
+        <img src="${poster || mediaUrl || fallbackImage}" alt="Воспоминание ${title}" loading="lazy" />
       </span>
-      <span class="story-card__caption">${title}</span>
-      <span class="story-card__meta hint">${subtitle}</span>
+      <span class="story-thumb__caption">${title}</span>
     `;
     elements.storiesList.appendChild(card);
   });
-  setupStoryMediaPreviews();
   initStoriesCarousel();
 };
 
@@ -529,17 +545,24 @@ const renderPosts = () => {
     elements.feedGrid.appendChild(feedSentinel);
   }
   elements.showMore.hidden = feedFromApi ? !feedHasMore : visible.length >= list.length;
+  setupReelsAutoOpen();
 };
 
 const createPostCard = (post) => {
   const card = document.createElement("article");
   card.className = "post-card";
   card.id = `post-${post.id}`;
+  card.dataset.postId = post.id;
   const liked = feedFromApi ? Boolean(post.is_favorited) : Boolean(state.likes[post.id]);
   const saved = Boolean(state.saves[post.id]);
   const commentsCount = feedFromApi ? post.comments_count || 0 : (state.comments[post.id] || []).length;
   const mediaKind = post.media_kind === "video" || post.media_kind === "telegram_video" ? "video" : "photo";
   const mediaUrl = post.media_url || "";
+  const posterUrl = post.poster_url || post.poster || post.thumbnail_url || "";
+  card.dataset.mediaUrl = mediaUrl;
+  card.dataset.mediaType = mediaKind;
+  card.dataset.posterUrl = posterUrl;
+  card.dataset.caption = post.caption || "";
   const fallbackSrc = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
   const isReel = post.type === "reel" || post.media_kind === "telegram_video" || mediaKind === "video";
   card.innerHTML = `
@@ -593,11 +616,10 @@ const createPostCard = (post) => {
       img.src = fallbackSrc;
     });
   }
-  if (isReel && mediaUrl) {
-    const media = card.querySelector(".media");
-    media.classList.add("is-clickable");
-    media.addEventListener("click", () => openReelViewer(post.id));
-  }
+  card.addEventListener("click", (event) => {
+    if (event.target.closest("button, a, input, textarea, select, [data-action]")) return;
+    openReels(post.id, "click");
+  });
 
   return card;
 };
@@ -663,26 +685,6 @@ const renderFavorites = () => {
   elements.favoritesEmpty.hidden = savedPosts.length > 0;
 };
 
-const getReelPosts = () =>
-  postsData.filter(
-    (post) =>
-      post.media_url &&
-      (post.type === "reel" || post.media_kind === "video" || post.media_kind === "telegram_video")
-  );
-
-const getReelPostById = (id) => reelPosts.find((post) => String(post.id) === String(id));
-
-const updateReelButtons = () => {
-  const active = reelPosts[reelActiveIndex];
-  if (!active || !elements.reelTrack) return;
-  const activeItem = elements.reelTrack.querySelector(`[data-post-id="${active.id}"]`);
-  if (!activeItem) return;
-  const likeBtn = activeItem.querySelector("[data-reel-action='like']");
-  if (likeBtn) {
-    likeBtn.classList.toggle("is-active", Boolean(active.is_favorited));
-  }
-};
-
 const setVideoSource = (video, source) => {
   if (!video) return;
   if (video.getAttribute("data-src") === source && video.getAttribute("src")) return;
@@ -699,206 +701,463 @@ const clearVideoSource = (video) => {
   video.load();
 };
 
-const updateReelWindow = (index) => {
-  if (!elements.reelTrack) return;
-  const items = Array.from(elements.reelTrack.querySelectorAll(".reel-item"));
-  items.forEach((item, itemIndex) => {
-    const video = item.querySelector("video");
-    if (!video) return;
-    const postId = item.dataset.postId;
-    const post = getReelPostById(postId);
+const buildItemsFromFeedDOM = () => {
+  const cards = Array.from(elements.feedGrid?.querySelectorAll(".post-card") || []);
+  const items = cards
+    .map((card) => {
+      const postId = card.dataset.postId;
+      const post = postsData.find((entry) => String(entry.id) === String(postId)) || {};
+      const mediaUrl = card.dataset.mediaUrl || post.media_url || "";
+      const mediaType = card.dataset.mediaType || post.media_kind || (post.type === "reel" ? "video" : "photo");
+      const posterUrl = card.dataset.posterUrl || post.poster_url || post.poster || post.thumbnail_url || "";
+      const caption = card.dataset.caption || post.caption || "";
+      return {
+        ...post,
+        id: post.id || postId,
+        media_url: mediaUrl,
+        media_kind: mediaType,
+        poster_url: posterUrl,
+        caption,
+      };
+    })
+    .filter((item) => item && (item.media_url || item.poster_url));
+  return items.length ? items : filteredPosts();
+};
+
+const getBookingTarget = () => "#funnel";
+
+const createReelsOverlay = () => {
+  if (reelsOverlay) return;
+  reelsOverlay = document.createElement("div");
+  reelsOverlay.className = "reels-overlay";
+  reelsOverlay.setAttribute("role", "dialog");
+  reelsOverlay.setAttribute("aria-modal", "true");
+  reelsOverlay.setAttribute("aria-hidden", "true");
+  reelsOverlay.innerHTML = `
+    <div class="reels-overlay__backdrop" data-reels-close></div>
+    <div class="reels-overlay__panel">
+      <button class="reels-overlay__back" type="button" data-reels-back>Назад</button>
+      <button class="reels-overlay__close" type="button" data-reels-close aria-label="Закрыть">✕</button>
+      <div class="reels-overlay__track" tabindex="0"></div>
+      <button class="reels-overlay__nav reels-overlay__nav--prev" type="button" aria-label="Предыдущий ролик">↑</button>
+      <button class="reels-overlay__nav reels-overlay__nav--next" type="button" aria-label="Следующий ролик">↓</button>
+    </div>
+  `;
+  document.body.appendChild(reelsOverlay);
+  reelsTrack = reelsOverlay.querySelector(".reels-overlay__track");
+  reelsOverlay.addEventListener("click", (event) => {
+    if (event.target.closest("[data-reels-close]")) {
+      closeReels();
+    }
+    if (event.target.closest("[data-reels-back]")) {
+      closeReels();
+    }
+  });
+  reelsOverlay.querySelector(".reels-overlay__nav--prev")?.addEventListener("click", () => scrollReelsBy(-1));
+  reelsOverlay.querySelector(".reels-overlay__nav--next")?.addEventListener("click", () => scrollReelsBy(1));
+
+  reelsTrack.addEventListener("click", (event) => {
+    const actionButton = event.target.closest("[data-reels-action]");
+    if (!actionButton) return;
+    const item = actionButton.closest(".reels-overlay__item");
+    if (!item) return;
+    const post = reelsPosts.find((entry) => String(entry.id) === String(item.dataset.postId));
     if (!post) return;
-    const shouldLoad = Math.abs(itemIndex - index) <= 1;
-    if (shouldLoad) {
-      setVideoSource(video, post.media_url);
-      video.muted = reelMuted;
-      video.preload = "metadata";
-    } else {
-      clearVideoSource(video);
-      video.preload = "none";
+    const action = actionButton.dataset.reelsAction;
+    if (action === "comment") {
+      openComments(post.id);
+      return;
+    }
+    if (action === "share") {
+      handlePostAction(post, "share");
+      return;
+    }
+    if (action === "like" || action === "save") {
+      handlePostAction(post, action);
+      updateReelsButtons();
+      return;
+    }
+  });
+
+  reelsTrack.addEventListener("click", (event) => {
+    const muteBtn = event.target.closest(".reels-overlay__mute");
+    if (!muteBtn) return;
+    reelsMuted = !reelsMuted;
+    reelsTrack.querySelectorAll(".reels-overlay__mute").forEach((button) => {
+      button.textContent = reelsMuted ? "🔇" : "🔊";
+    });
+    reelsTrack.querySelectorAll("video").forEach((video) => {
+      video.muted = reelsMuted;
+    });
+  });
+
+  reelsTrack.addEventListener("click", (event) => {
+    const bookBtn = event.target.closest(".reels-overlay__book");
+    if (!bookBtn) return;
+    const target = getBookingTarget();
+    closeReels({ bookingTarget: target });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!reelsOverlay?.classList.contains("is-open")) return;
+    if (event.key === "Escape") {
+      closeReels();
+    }
+    if (event.key === "ArrowDown") {
+      scrollReelsBy(1);
+    }
+    if (event.key === "ArrowUp") {
+      scrollReelsBy(-1);
+    }
+  });
+
+  window.addEventListener("popstate", (event) => {
+    if (!reelsOverlay?.classList.contains("is-open")) return;
+    if (event.state?.reels) return;
+    closeReels({ fromPopState: true });
+  });
+};
+
+const clearReelsTimeout = (mediaEl) => {
+  const current = reelsMediaTimeouts.get(mediaEl);
+  if (current) {
+    clearTimeout(current);
+    reelsMediaTimeouts.delete(mediaEl);
+  }
+};
+
+const setReelsTimeout = (mediaEl, onTimeout) => {
+  clearReelsTimeout(mediaEl);
+  const timer = setTimeout(onTimeout, REELS_LOAD_TIMEOUT);
+  reelsMediaTimeouts.set(mediaEl, timer);
+};
+
+const showReelsFallback = (mediaEl, post, mediaKind, reason, retry) => {
+  const fallback = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
+  const poster = post.poster_url || post.poster || post.thumbnail_url || fallback;
+  mediaEl.innerHTML = `
+    <div class="reels-overlay__fallback">
+      <img src="${poster}" alt="${post.caption || "Медиа"}" loading="lazy" />
+      <div class="reels-overlay__status">Не удалось загрузить</div>
+      <button class="reels-overlay__retry" type="button">Повторить</button>
+    </div>
+  `;
+  reelsLog("fallback", { postId: post.id, mediaKind, reason });
+  const retryButton = mediaEl.querySelector(".reels-overlay__retry");
+  retryButton?.addEventListener("click", () => retry(mediaEl));
+};
+
+const renderReelsMedia = (mediaEl, post, shouldLoad, isActive) => {
+  const mediaUrl = post.media_url || "";
+  const mediaKind =
+    post.media_kind === "video" || post.media_kind === "telegram_video" || post.type === "reel" ? "video" : "photo";
+  const poster = post.poster_url || post.poster || post.thumbnail_url || "";
+  const fallback = post.type === "reel" ? ASSETS.reel : ASSETS.photo;
+  const targetSrc = mediaKind === "photo" ? mediaUrl || fallback : mediaUrl;
+  const targetPoster = poster || fallback;
+
+  if (!shouldLoad) {
+    mediaEl.dataset.loaded = "0";
+    mediaEl.dataset.src = targetPoster;
+    mediaEl.dataset.kind = mediaKind;
+    mediaEl.innerHTML = `<img src="${targetPoster}" alt="${post.caption || "Медиа"}" loading="lazy" />`;
+    return;
+  }
+
+  if (mediaEl.dataset.loaded === "1" && mediaEl.dataset.src === targetSrc && mediaEl.dataset.kind === mediaKind) {
+    return;
+  }
+
+  clearReelsTimeout(mediaEl);
+  mediaEl.dataset.loaded = "0";
+  mediaEl.dataset.src = targetSrc;
+  mediaEl.dataset.kind = mediaKind;
+
+  mediaEl.innerHTML = `
+    <div class="reels-overlay__spinner" aria-hidden="true"></div>
+  `;
+
+  const handleTimeout = () => {
+    showReelsFallback(mediaEl, post, mediaKind, "timeout", (el) => {
+      const bust = `v=${Date.now()}`;
+      if (mediaKind === "photo") {
+        const retryUrl = targetSrc ? `${targetSrc}${targetSrc.includes("?") ? "&" : "?"}${bust}` : targetPoster;
+        loadReelsImage(el, post, retryUrl, true);
+      } else {
+        const retryUrl = mediaUrl ? `${mediaUrl}${mediaUrl.includes("?") ? "&" : "?"}${bust}` : "";
+        loadReelsVideo(el, post, retryUrl, true);
+      }
+    });
+  };
+
+  setReelsTimeout(mediaEl, handleTimeout);
+
+  const loadReelsImage = (el, postData, src, eager) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.loading = eager ? "eager" : "lazy";
+    img.alt = postData.caption || "Фото";
+    img.onload = () => {
+      clearReelsTimeout(el);
+      el.dataset.loaded = "1";
+      el.innerHTML = "";
+      el.appendChild(img);
+      reelsLog("image:loaded", { postId: postData.id, src });
+    };
+    img.onerror = () => {
+      clearReelsTimeout(el);
+      showReelsFallback(el, postData, "photo", "error", (target) => loadReelsImage(target, postData, src, true));
+    };
+    img.src = src || targetPoster;
+  };
+
+  const loadReelsVideo = (el, postData, src, eager) => {
+    if (!src) {
+      clearReelsTimeout(el);
+      showReelsFallback(el, postData, "video", "no-src", (target) => loadReelsVideo(target, postData, src, true));
+      return;
+    }
+    const video = document.createElement("video");
+    video.playsInline = true;
+    video.muted = reelsMuted;
+    video.preload = eager ? "metadata" : "none";
+    if (targetPoster) video.poster = targetPoster;
+    el.appendChild(video);
+    video.addEventListener("loadeddata", () => {
+      clearReelsTimeout(el);
+      el.dataset.loaded = "1";
+      const spinner = el.querySelector(".reels-overlay__spinner");
+      if (spinner) spinner.remove();
+      reelsLog("video:loaded", { postId: postData.id, src });
+      if (isActive) {
+        video.play().catch((error) => {
+          reelsLog("video:play-blocked", { postId: postData.id, error: error?.message });
+        });
+      }
+    });
+    video.addEventListener("error", () => {
+      clearReelsTimeout(el);
+      showReelsFallback(el, postData, "video", "error", (target) => loadReelsVideo(target, postData, src, true));
+    });
+    setVideoSource(video, src);
+    video.load();
+  };
+
+  if (mediaKind === "photo") {
+    if (!targetSrc) {
+      showReelsFallback(mediaEl, post, mediaKind, "no-src", (target) => loadReelsImage(target, post, targetPoster, true));
+      return;
+    }
+    loadReelsImage(mediaEl, post, targetSrc, isActive);
+    return;
+  }
+
+  loadReelsVideo(mediaEl, post, mediaUrl, isActive);
+};
+
+const updateReelsWindow = () => {
+  if (!reelsTrack) return;
+  const items = Array.from(reelsTrack.querySelectorAll(".reels-overlay__item"));
+  items.forEach((item) => {
+    const index = Number(item.dataset.index);
+    const postId = item.dataset.postId;
+    const post = reelsPosts.find((entry) => String(entry.id) === String(postId));
+    if (!post) return;
+    const media = item.querySelector(".reels-overlay__media");
+    if (!media) return;
+    const shouldLoad = Math.abs(index - reelsActiveIndex) <= REELS_WINDOW;
+    renderReelsMedia(media, post, shouldLoad, index === reelsActiveIndex);
+  });
+};
+
+const updateReelsButtons = () => {
+  if (!reelsTrack) return;
+  const active = reelsPosts[reelsActiveIndex];
+  if (!active) return;
+  const item = reelsTrack.querySelector(`[data-post-id="${active.id}"]`);
+  if (!item) return;
+  item.querySelectorAll("[data-reels-action]").forEach((button) => {
+    const action = button.dataset.reelsAction;
+    if (action === "like") {
+      button.classList.toggle("is-active", Boolean(active.is_favorited));
+    }
+    if (action === "save") {
+      button.classList.toggle("is-active", Boolean(state.saves[active.id]));
     }
   });
 };
 
-const attachReelProgress = (item, video) => {
-  const bar = item.querySelector(".reel-progress__bar");
-  if (!bar || !video) return () => {};
-  const onTime = () => {
-    if (!video.duration) {
-      bar.style.width = "0%";
-      return;
-    }
-    bar.style.width = `${Math.min(100, (video.currentTime / video.duration) * 100)}%`;
-  };
-  video.addEventListener("timeupdate", onTime);
-  return () => video.removeEventListener("timeupdate", onTime);
-};
-
-let reelProgressCleanup = null;
-
-const setActiveReel = (index) => {
-  if (!elements.reelTrack) return;
-  reelActiveIndex = Math.max(0, Math.min(index, reelPosts.length - 1));
-  updateReelWindow(reelActiveIndex);
-  const items = Array.from(elements.reelTrack.querySelectorAll(".reel-item"));
-  items.forEach((item, itemIndex) => {
+const setActiveReelsIndex = (index) => {
+  reelsActiveIndex = Math.max(0, Math.min(index, reelsPosts.length - 1));
+  updateReelsWindow();
+  const items = Array.from(reelsTrack.querySelectorAll(".reels-overlay__item"));
+  items.forEach((item) => {
     const video = item.querySelector("video");
     if (!video) return;
-    if (itemIndex === reelActiveIndex) {
-      video.muted = reelMuted;
+    const itemIndex = Number(item.dataset.index);
+    if (itemIndex === reelsActiveIndex) {
+      video.muted = reelsMuted;
       video.play().catch(() => {});
-      if (reelProgressCleanup) reelProgressCleanup();
-      reelProgressCleanup = attachReelProgress(item, video);
     } else {
       video.pause();
     }
   });
-  updateReelButtons();
+  updateReelsButtons();
 };
 
-const openReelViewer = (postId) => {
-  if (!elements.reelViewer || !elements.reelTrack) return;
-  const reels = getReelPosts().slice(0, REEL_MAX_ITEMS);
-  if (!reels.length) return;
-  reelPosts = reels;
-  elements.reelTrack.innerHTML = "";
-  reels.forEach((post) => {
+const scrollReelsBy = (direction) => {
+  if (!reelsTrack) return;
+  const next = Math.max(0, Math.min(reelsActiveIndex + direction, reelsPosts.length - 1));
+  reelsTrack.scrollTo({ top: next * reelsTrack.clientHeight, behavior: "smooth" });
+};
+
+const buildReelsItems = () => {
+  if (!reelsTrack) return;
+  reelsTrack.innerHTML = "";
+  reelsPosts.forEach((post, index) => {
     const item = document.createElement("section");
-    item.className = "reel-item";
+    item.className = "reels-overlay__item";
+    item.dataset.index = String(index);
     item.dataset.postId = post.id;
+    const author = post.author || post.user_name || post.owner || "Конная кавалерия";
+    const caption = post.caption || post.text || "";
+    const hashtags = post.hashtags && post.hashtags.length ? post.hashtags.join(" ") : "";
     item.innerHTML = `
-      <div class="reel-item__content">
-        <video data-src="${post.media_url}" playsinline preload="none" muted></video>
-        <div class="reel-progress"><span class="reel-progress__bar"></span></div>
-        <div class="reel-actions">
-          <button class="reel-action" data-reel-action="like" type="button" aria-label="Лайк">♡</button>
-          <button class="reel-action" data-reel-action="comment" type="button" aria-label="Комментарий">💬</button>
-          <button class="reel-action" data-reel-action="share" type="button" aria-label="Поделиться">↗</button>
-          <button class="reel-action" data-reel-action="review" type="button" aria-label="Отзыв">★</button>
+      <div class="reels-overlay__card">
+        <div class="reels-overlay__media"></div>
+        <button class="reels-overlay__mute" type="button" aria-label="Звук">${reelsMuted ? "🔇" : "🔊"}</button>
+        <div class="reels-overlay__actions">
+          <button class="reels-overlay__action" data-reels-action="like" type="button" aria-label="Лайк">♡</button>
+          <button class="reels-overlay__action" data-reels-action="comment" type="button" aria-label="Комментарий">💬</button>
+          <button class="reels-overlay__action" data-reels-action="share" type="button" aria-label="Поделиться">↗</button>
+          <button class="reels-overlay__action" data-reels-action="save" type="button" aria-label="Сохранить">★</button>
         </div>
-        <button class="reel-mute" type="button" aria-label="Звук">${reelMuted ? "🔇" : "🔊"}</button>
+        <div class="reels-overlay__meta">
+          <strong>${author}</strong>
+          <p>${caption}</p>
+          ${hashtags ? `<span class="reels-overlay__tags">${hashtags}</span>` : ""}
+          <button class="reels-overlay__book" type="button">Записаться</button>
+        </div>
       </div>
     `;
-    elements.reelTrack.appendChild(item);
+    reelsTrack.appendChild(item);
   });
-  elements.reelViewer.showModal();
-  document.body.classList.add("body--locked");
+};
 
-  const index = Math.max(
+const openReels = (postId, reason = "click") => {
+  createReelsOverlay();
+  const allItems = buildItemsFromFeedDOM();
+  if (!allItems.length) return;
+  let startIndex = Math.max(
     0,
-    reels.findIndex((post) => post.id === postId)
+    allItems.findIndex((post) => String(post.id) === String(postId))
   );
-  const scrollTarget = elements.reelTrack.clientHeight * index;
-  elements.reelTrack.scrollTop = scrollTarget;
-
-  if (reelObserver) {
-    reelObserver.disconnect();
+  let start = 0;
+  if (allItems.length > REELS_MAX_ITEMS) {
+    const half = Math.floor(REELS_MAX_ITEMS / 2);
+    start = Math.max(0, startIndex - half);
+    if (start + REELS_MAX_ITEMS > allItems.length) {
+      start = Math.max(0, allItems.length - REELS_MAX_ITEMS);
+    }
   }
-  reelObserver = new IntersectionObserver(
+  reelsPosts = allItems.slice(start, start + REELS_MAX_ITEMS);
+  if (!reelsPosts.length) return;
+  startIndex = Math.max(
+    0,
+    reelsPosts.findIndex((post) => String(post.id) === String(postId))
+  );
+  reelsLog("open", { postId, startIndex, count: reelsPosts.length, reason });
+  buildReelsItems();
+  reelsScrollY = window.scrollY;
+  reelsOverlay.classList.add("is-open");
+  reelsOverlay.removeAttribute("aria-hidden");
+  document.body.classList.add("body--locked");
+  requestAnimationFrame(() => {
+    reelsTrack.scrollTop = reelsTrack.clientHeight * startIndex;
+    setActiveReelsIndex(startIndex);
+  });
+
+  if (reelsObserver) {
+    reelsObserver.disconnect();
+  }
+  reelsObserver = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
-        const itemIndex = Array.from(elements.reelTrack.children).indexOf(entry.target);
-        if (itemIndex >= 0) {
-          setActiveReel(itemIndex);
+        const index = Number(entry.target.dataset.index);
+        if (Number.isFinite(index)) {
+          setActiveReelsIndex(index);
         }
       });
     },
-    { threshold: 0.6, root: elements.reelTrack }
+    { root: reelsTrack, threshold: REELS_VISIBILITY }
   );
-  Array.from(elements.reelTrack.children).forEach((item) => reelObserver.observe(item));
-  setActiveReel(index);
+  reelsTrack.querySelectorAll(".reels-overlay__item").forEach((item) => reelsObserver.observe(item));
+
+  reelsHistoryActive = true;
+  if (!history.state?.reels) {
+    history.pushState({ reels: true, postId, reason }, "");
+  }
+  if (reason === "auto") {
+    sessionStorage.setItem(REELS_AUTO_KEY, "1");
+  }
 };
 
-const closeReelViewer = () => {
-  if (!elements.reelViewer?.open) return;
-  elements.reelViewer.close();
+const closeReels = ({ fromPopState = false, bookingTarget = null } = {}) => {
+  if (!reelsOverlay || !reelsOverlay.classList.contains("is-open")) return;
+  if (reelsClosing) return;
+  reelsClosing = true;
+  reelsOverlay.classList.remove("is-open");
+  reelsOverlay.setAttribute("aria-hidden", "true");
   document.body.classList.remove("body--locked");
-  Array.from(elements.reelTrack.querySelectorAll("video")).forEach((video) => video.pause());
-  if (reelObserver) {
-    reelObserver.disconnect();
-    reelObserver = null;
+  window.scrollTo({ top: reelsScrollY, behavior: "auto" });
+  reelsTrack?.querySelectorAll("video").forEach((video) => video.pause());
+  if (reelsObserver) {
+    reelsObserver.disconnect();
+    reelsObserver = null;
   }
-  if (reelProgressCleanup) {
-    reelProgressCleanup();
-    reelProgressCleanup = null;
+  if (!fromPopState && reelsHistoryActive && history.state?.reels) {
+    history.back();
+  }
+  reelsHistoryActive = false;
+  reelsClosing = false;
+  if (bookingTarget) {
+    requestAnimationFrame(() => {
+      const target = document.querySelector(bookingTarget);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth" });
+      } else {
+        window.location.href = bookingTarget;
+      }
+    });
   }
 };
 
-const setupReelViewer = () => {
-  if (!elements.reelViewer || !elements.reelTrack || !elements.reelClose) return;
-  elements.reelClose.addEventListener("click", closeReelViewer);
-  elements.reelViewer.addEventListener("click", (event) => {
-    if (event.target === elements.reelViewer) {
-      closeReelViewer();
-    }
-  });
-  elements.reelViewer.addEventListener("close", () => {
-    document.body.classList.remove("body--locked");
-    Array.from(elements.reelTrack.querySelectorAll("video")).forEach((video) => video.pause());
-    if (reelObserver) {
-      reelObserver.disconnect();
-      reelObserver = null;
-    }
-    if (reelProgressCleanup) {
-      reelProgressCleanup();
-      reelProgressCleanup = null;
-    }
-  });
-  elements.reelTrack.addEventListener("click", (event) => {
-    const actionButton = event.target.closest("[data-reel-action]");
-    if (!actionButton) return;
-    const action = actionButton.dataset.reelAction;
-    const item = actionButton.closest(".reel-item");
-    if (!item) return;
-    const post = getReelPostById(item.dataset.postId);
-    if (!post) return;
-    if (action === "review") {
-      openDialog(elements.reviewModal);
-      return;
-    }
-    handlePostAction(post, action);
-    updateReelButtons();
-  });
-  elements.reelTrack.addEventListener("click", (event) => {
-    const muteBtn = event.target.closest(".reel-mute");
-    if (!muteBtn) return;
-    reelMuted = !reelMuted;
-    const videos = Array.from(elements.reelTrack.querySelectorAll("video"));
-    videos.forEach((video) => {
-      video.muted = reelMuted;
-    });
-    elements.reelTrack.querySelectorAll(".reel-mute").forEach((button) => {
-      button.textContent = reelMuted ? "🔇" : "🔊";
-    });
-  });
-  elements.reelTrack.addEventListener(
-    "wheel",
-    (event) => {
-      if (!elements.reelViewer.open) return;
-      if (Math.abs(event.deltaY) < 10) return;
-      event.preventDefault();
-      const current = Math.round(elements.reelTrack.scrollTop / elements.reelTrack.clientHeight);
-      const next = event.deltaY > 0 ? current + 1 : current - 1;
-      const maxIndex = elements.reelTrack.children.length - 1;
-      const clamped = Math.min(Math.max(next, 0), maxIndex);
-      elements.reelTrack.scrollTo({ top: clamped * elements.reelTrack.clientHeight, behavior: "smooth" });
+const setupReelsAutoOpen = () => {
+  if (window.matchMedia(`(min-width: ${REELS_MOBILE_MAX + 1}px)`).matches) return;
+  if (sessionStorage.getItem(REELS_AUTO_KEY)) return;
+  if (!elements.feedGrid) return;
+  const firstCard = elements.feedGrid.querySelector(".post-card");
+  if (!firstCard) return;
+  if (reelsAutoObserver) reelsAutoObserver.disconnect();
+  reelsAutoObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const postId = entry.target.dataset.postId;
+        if (!postId) return;
+        openReels(postId, "auto");
+        reelsAutoObserver?.disconnect();
+      });
     },
-    { passive: false }
+    { threshold: REELS_VISIBILITY }
   );
-  document.addEventListener("keydown", (event) => {
-    if (!elements.reelViewer.open) return;
-    if (event.key === "Escape") {
-      closeReelViewer();
-    }
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      const current = Math.round(elements.reelTrack.scrollTop / elements.reelTrack.clientHeight);
-      const next = event.key === "ArrowDown" ? current + 1 : current - 1;
-      const maxIndex = elements.reelTrack.children.length - 1;
-      const clamped = Math.min(Math.max(next, 0), maxIndex);
-      elements.reelTrack.scrollTo({ top: clamped * elements.reelTrack.clientHeight, behavior: "smooth" });
-    }
-  });
+  reelsAutoObserver.observe(firstCard);
+};
+
+const setupReelsOverlay = () => {
+  createReelsOverlay();
+  setupReelsAutoOpen();
 };
 
 const openComments = async (postId) => {
@@ -1397,181 +1656,14 @@ const updateStoriesArrows = ($list, arrows) => {
 
 const initStoriesCarousel = () => {
   if (!elements.storiesList) return;
-  if (!window.jQuery || !window.jQuery.fn?.slick) {
-    elements.storiesList.classList.add("stories__list--fallback");
-    return;
-  }
-  const $list = window.jQuery(elements.storiesList);
-  if ($list.hasClass("slick-initialized")) {
-    return;
-  }
-  const arrows = ensureStoriesArrows();
-  elements.storiesList.classList.remove("stories__list--fallback");
-  const showArrows = !window.matchMedia("(max-width: 768px)").matches;
-  $list.on("init", () => {
-    applyStories3DClasses();
-    updateStoriesArrows($list, arrows);
-  });
-  $list.on("afterChange", () => {
-    applyStories3DClasses();
-    updateStoriesArrows($list, arrows);
-  });
-  $list.slick({
-    centerMode: true,
-    centerPadding: "0px",
-    variableWidth: false,
-    infinite: false,
-    arrows: showArrows,
-    prevArrow: arrows?.prev || undefined,
-    nextArrow: arrows?.next || undefined,
-    slidesToScroll: 1,
-    dots: false,
-    swipe: true,
-    touchMove: true,
-    draggable: true,
-    swipeToSlide: true,
-    adaptiveHeight: false,
-    slidesToShow: 3,
-    responsive: [
-      {
-        breakpoint: 768,
-        settings: { slidesToShow: 1, arrows: false, centerMode: true, swipe: true, touchMove: true },
-      },
-    ],
-  });
-  applyStories3DClasses();
-  updateStoriesArrows($list, arrows);
+  elements.storiesList.classList.add("stories__list--fallback", "stories__list--strip");
 };
 
-const applyStories3DClasses = () => {
-  if (!elements.storiesList) return;
-  const slides = Array.from(elements.storiesList.querySelectorAll(".slick-slide"));
-  if (!slides.length) return;
-  slides.forEach((slide) => {
-    slide.classList.remove("is-center", "is-prev", "is-next");
-  });
-  const current =
-    slides.find((slide) => slide.classList.contains("slick-center")) ||
-    slides.find((slide) => slide.classList.contains("slick-current")) ||
-    slides[0];
-  const currentIndex = slides.indexOf(current);
-  const mark = (offset, className) => {
-    const target = slides[currentIndex + offset];
-    if (target) target.classList.add(className);
-  };
-  if (current) current.classList.add("is-center");
-  mark(-1, "is-prev");
-  mark(1, "is-next");
-};
+const applyStories3DClasses = () => {};
 
-const setupStoriesInteractions = () => {
-  document.addEventListener("click", (event) => {
-    const card = event.target.closest(".stories__item");
-    if (!card) return;
-    const storyId = card.dataset.storyId;
-    const story = storiesData.find((item) => String(item.id) === String(storyId));
-    if (story) {
-      openStory(story);
-    }
-  });
-};
+const setupStoriesInteractions = () => {};
 
-const setupStoriesSwipe = () => {
-  if (storiesSwipeBound) return;
-  const viewport = document.getElementById("stories-slider");
-  if (!viewport || !elements.storiesList || !window.jQuery) return;
-  const $list = window.jQuery(elements.storiesList);
-  if (!$list.hasClass("slick-initialized")) return;
-  storiesSwipeBound = true;
-
-  const LOCK_THRESHOLD = 8;
-  const SWIPE_THRESHOLD = 40;
-  let pointerId = null;
-  let startX = 0;
-  let startY = 0;
-  let swiping = false;
-  let directionLocked = false;
-  let captured = false;
-  const disableSlickSwipe = () => {
-    $list.slick("slickSetOption", "swipe", false, true);
-    $list.slick("slickSetOption", "touchMove", false, true);
-  };
-  const enableSlickSwipe = () => {
-    $list.slick("slickSetOption", "swipe", true, true);
-    $list.slick("slickSetOption", "touchMove", true, true);
-  };
-
-  const resetSwipe = () => {
-    if (pointerId !== null) {
-      try {
-        if (captured) {
-          viewport.releasePointerCapture(pointerId);
-        }
-      } catch (error) {
-        // Ignore capture release errors.
-      }
-    }
-    enableSlickSwipe();
-    pointerId = null;
-    startX = 0;
-    startY = 0;
-    swiping = false;
-    directionLocked = false;
-    captured = false;
-  };
-
-  viewport.addEventListener("pointerdown", (event) => {
-    if (event.pointerType === "mouse") return;
-    if (!event.isPrimary) return;
-    pointerId = event.pointerId;
-    startX = event.clientX;
-    startY = event.clientY;
-    swiping = false;
-    directionLocked = false;
-    captured = false;
-  });
-
-  viewport.addEventListener("pointermove", (event) => {
-    if (pointerId !== event.pointerId) return;
-    const deltaX = event.clientX - startX;
-    const deltaY = event.clientY - startY;
-    if (!directionLocked) {
-      if (Math.abs(deltaX) < LOCK_THRESHOLD && Math.abs(deltaY) < LOCK_THRESHOLD) return;
-      directionLocked = true;
-      swiping = Math.abs(deltaX) > Math.abs(deltaY);
-    }
-    if (!swiping) return;
-    if (!captured) {
-      disableSlickSwipe();
-      try {
-        viewport.setPointerCapture(pointerId);
-        captured = true;
-      } catch (error) {
-        captured = false;
-      }
-    }
-    event.preventDefault();
-  });
-
-  viewport.addEventListener("pointerup", (event) => {
-    if (pointerId !== event.pointerId) return;
-    const deltaX = event.clientX - startX;
-    const deltaY = event.clientY - startY;
-    if (swiping && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
-      if (deltaX < 0) {
-        $list.slick("slickNext");
-      } else {
-        $list.slick("slickPrev");
-      }
-    }
-    resetSwipe();
-  });
-
-  viewport.addEventListener("pointercancel", (event) => {
-    if (pointerId !== event.pointerId) return;
-    resetSwipe();
-  });
-};
+const setupStoriesSwipe = () => {};
 
 const setupComments = () => {
   elements.commentForm.addEventListener("submit", async (event) => {
@@ -2026,7 +2118,7 @@ const init = async () => {
   setupThemeToggle();
   setupMenuToggle();
   setupFavorites();
-  setupReelViewer();
+  setupReelsOverlay();
   setupCalendarNavigation();
   setupWizard();
   setupForm();
