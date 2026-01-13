@@ -387,11 +387,18 @@ const destroyStoriesCarousel = () => {
   }
 };
 
+const buildMediaThumbUrl = (url, size = 256) => {
+  if (!url) return "";
+  const joiner = url.includes("?") ? "&" : "?";
+  return `${url}${joiner}thumb=${size}`;
+};
+
 const renderStories = () => {
   destroyStoriesCarousel();
   elements.storiesList.classList.add("stories__list--fallback", "stories__list--strip");
   elements.storiesList.innerHTML = "";
-  storiesData.forEach((story) => {
+  const thumbUrls = [];
+  storiesData.forEach((story, index) => {
     const title = story.title || "Воспоминание";
     const subtitle = story.subtitle || story.text || "Новая история";
     const mediaUrl = story.media_url || story.mediaUrl || "";
@@ -402,7 +409,7 @@ const renderStories = () => {
     const poster = story.poster_url || story.poster || story.thumbnail_url || "";
     const fallbackImage = ASSETS.story;
     const isVideo = mediaKind === "video";
-    const thumbSrc = poster || mediaUrl || "";
+    const thumbSrc = isVideo ? poster || buildMediaThumbUrl(mediaUrl) : buildMediaThumbUrl(mediaUrl) || poster;
     const card = document.createElement("button");
     card.type = "button";
     card.className = "story-thumb stories__item";
@@ -426,8 +433,20 @@ const renderStories = () => {
       <span class="story-thumb__caption">${title}</span>
     `;
     elements.storiesList.appendChild(card);
+    if (thumbSrc) {
+      thumbUrls.push(thumbSrc);
+      const img = card.querySelector("img");
+      if (img && index < 12) {
+        img.loading = "eager";
+        img.fetchPriority = "high";
+      }
+    }
   });
   initStoriesCarousel();
+  thumbUrls.slice(0, 35).forEach((url) => {
+    const prefetch = new Image();
+    prefetch.src = url;
+  });
 };
 
 const setupStoryMediaPreviews = () => {

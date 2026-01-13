@@ -37,6 +37,7 @@
   place-items: center;
   background: rgba(124, 58, 237, 0.12);
   line-height: 0;
+  font-size: 0;
 }
 
 .story-thumb__media > * {
