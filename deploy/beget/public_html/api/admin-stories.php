@@ -43,6 +43,7 @@ if ($method === 'POST') {
 
     $title = trim((string)($data['title'] ?? $data['caption'] ?? ''));
     $text = trim((string)($data['text'] ?? $data['body'] ?? ''));
+    $maxVideoBytes = 50 * 1024 * 1024;
 
     if ($title === '') {
         sendError(400, 'Title is required');
@@ -53,6 +54,15 @@ if ($method === 'POST') {
         $tmp = $_FILES['media']['tmp_name'];
         $mime = mime_content_type($tmp) ?: '';
         $kind = str_starts_with($mime, 'video/') ? 'video' : 'photo';
+        if ($kind === 'video') {
+            if ($mime !== 'video/mp4') {
+                sendError(400, 'Only MP4 video is allowed');
+            }
+            $size = (int)($_FILES['media']['size'] ?? 0);
+            if ($size > $maxVideoBytes) {
+                sendError(400, 'Video is too large');
+            }
+        }
         $fileId = telegram_send_media($kind, $tmp);
         if (!$fileId) {
             sendError(500, 'Media upload failed');

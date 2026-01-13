@@ -28,6 +28,74 @@ const postForm = document.getElementById("post-form");
 const storyForm = document.getElementById("story-form");
 const calendarForm = document.getElementById("calendar-form");
 
+const MAX_VIDEO_MB = 50;
+const RECOMMENDED_VIDEO_SECONDS = 60;
+const LONG_VIDEO_SECONDS = 180;
+
+const setupStoryMediaValidation = () => {
+  if (!storyForm) return;
+  const input = storyForm.querySelector('input[name="media"]');
+  if (!input) return;
+  const status = document.createElement("div");
+  status.className = "hint";
+  input.parentElement.appendChild(status);
+
+  const resetStatus = () => {
+    status.textContent = "";
+    status.classList.remove("warning", "alert");
+  };
+
+  const setStatus = (message, type) => {
+    status.textContent = message;
+    status.classList.remove("warning", "alert");
+    if (type) status.classList.add(type);
+  };
+
+  const fileIsMp4 = (file) => {
+    if (file.type) return file.type === "video/mp4";
+    return file.name.toLowerCase().endsWith(".mp4");
+  };
+
+  input.addEventListener("change", () => {
+    resetStatus();
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const isVideo = file.type.startsWith("video/") || fileIsMp4(file);
+    if (isVideo && !fileIsMp4(file)) {
+      setStatus("Only MP4 video is allowed.", "alert");
+      input.value = "";
+      return;
+    }
+
+    if (isVideo && file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      setStatus(`Video is larger than ${MAX_VIDEO_MB}MB.`, "alert");
+      input.value = "";
+      return;
+    }
+
+    if (isVideo) {
+      const tempVideo = document.createElement("video");
+      tempVideo.preload = "metadata";
+      const objectUrl = URL.createObjectURL(file);
+      tempVideo.src = objectUrl;
+      tempVideo.onloadedmetadata = () => {
+        URL.revokeObjectURL(objectUrl);
+        const duration = Math.round(tempVideo.duration || 0);
+        if (duration >= LONG_VIDEO_SECONDS) {
+          setStatus(`Warning: long video (${duration}s). Recommended <= ${RECOMMENDED_VIDEO_SECONDS}s.`, "warning");
+          return;
+        }
+        if (duration > RECOMMENDED_VIDEO_SECONDS) {
+          setStatus(`Warning: video duration ${duration}s (recommended <= ${RECOMMENDED_VIDEO_SECONDS}s).`, "warning");
+          return;
+        }
+        setStatus(`Duration: ${duration}s.`, "");
+      };
+    }
+  });
+};
+
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabPanels = document.querySelectorAll(".tab-panel");
 
@@ -272,6 +340,7 @@ tabButtons.forEach((button) => {
 showTab("posts");
 
 const init = async () => {
+  setupStoryMediaValidation();
   await loadMe();
   await Promise.all([loadPosts(), loadStories(), loadAvailability()]);
 };
