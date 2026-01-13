@@ -393,6 +393,29 @@ const buildMediaThumbUrl = (url, size = 256) => {
   return `${url}${joiner}thumb=${size}`;
 };
 
+const resolveStoryMedia = (story) => {
+  if (Array.isArray(story?.media) && story.media.length) {
+    return story.media.map((media) => ({
+      media_url: media.media_url || "",
+      media_type: media.media_type || "",
+      thumb_url: media.thumb_url || media.poster_url || "",
+    }));
+  }
+  const mediaUrl = story.media_url || story.mediaUrl || "";
+  if (!mediaUrl) return [];
+  const mediaType =
+    story.media_kind === "video" || story.media_kind === "telegram_video" || story.media_type === "video"
+      ? "video"
+      : "image";
+  return [
+    {
+      media_url: mediaUrl,
+      media_type: mediaType,
+      thumb_url: buildMediaThumbUrl(mediaUrl),
+    },
+  ];
+};
+
 const renderStories = () => {
   destroyStoriesCarousel();
   elements.storiesList.classList.add("stories__list--fallback", "stories__list--strip");
@@ -401,12 +424,11 @@ const renderStories = () => {
   storiesData.forEach((story, index) => {
     const title = story.title || "Воспоминание";
     const subtitle = story.subtitle || story.text || "Новая история";
-    const mediaUrl = story.media_url || story.mediaUrl || "";
-    const mediaKind =
-      story.media_kind === "video" || story.media_kind === "telegram_video" || story.media_type === "video"
-        ? "video"
-        : "photo";
-    const poster = story.poster_url || story.poster || story.thumbnail_url || "";
+    const mediaList = resolveStoryMedia(story);
+    const first = mediaList[0];
+    const mediaUrl = first?.media_url || "";
+    const mediaKind = first?.media_type === "video" ? "video" : "photo";
+    const poster = first?.thumb_url || story.poster_url || story.poster || story.thumbnail_url || "";
     const fallbackImage = ASSETS.story;
     const isVideo = mediaKind === "video";
     const thumbSrc = isVideo ? poster || buildMediaThumbUrl(mediaUrl) : buildMediaThumbUrl(mediaUrl) || poster;
@@ -422,6 +444,7 @@ const renderStories = () => {
     card.dataset.title = title;
     card.dataset.subtitle = subtitle;
     card.dataset.caption = subtitle;
+    card.dataset.media = JSON.stringify(mediaList);
     card.innerHTML = `
       <span class="story-thumb__media">
         ${
@@ -504,10 +527,12 @@ const setupStoryMediaPreviews = () => {
 };
 
 const openStory = (story) => {
-  const mediaUrl = story.media_url || "";
-  const mediaKind = story.media_kind === "video" || story.media_kind === "telegram_video" ? "video" : "photo";
+  const mediaList = resolveStoryMedia(story);
+  const first = mediaList[0];
+  const mediaUrl = first?.media_url || "";
+  const mediaKind = first?.media_type === "video" ? "video" : "photo";
   const hasMedia = Boolean(mediaUrl);
-  const poster = story.poster_url || story.poster || story.thumbnail_url || "";
+  const poster = first?.thumb_url || story.poster_url || story.poster || story.thumbnail_url || "";
   const posterAttr = poster ? ' poster="' + poster + '"' : "";
   elements.storyContent.innerHTML = `
     <h3>${story.title}</h3>

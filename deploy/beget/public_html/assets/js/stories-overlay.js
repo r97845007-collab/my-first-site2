@@ -9,7 +9,7 @@
   let track = null;
   let progress = null;
   let items = [];
-  let activeIndex = 0;
+  let activeStoryIndex = 0;
   let observer = null;
   let scrollY = 0;
   let historyActive = false;
@@ -27,27 +27,47 @@
 
   const normalizeMediaType = (value) => (value || "").toLowerCase().includes("video") ? "video" : "image";
 
+  const normalizeMediaItem = (item) => {
+    const mediaUrl = item.media_url || item.mediaUrl || "";
+    const mediaType = normalizeMediaType(item.media_type || item.mediaType || item.kind || item.media_kind);
+    const posterUrl = item.thumb_url || item.poster_url || item.posterUrl || item.poster || "";
+    return { mediaUrl, mediaType, posterUrl };
+  };
+
   const collectStories = () => {
     const nodes = Array.from(document.querySelectorAll(STORY_SELECTOR));
     return nodes
       .map((node) => {
-        const mediaUrl = node.dataset.mediaUrl || node.dataset.mediaSrc || "";
-        const mediaType = normalizeMediaType(node.dataset.mediaType);
-        const posterUrl = node.dataset.posterUrl || node.dataset.poster || "";
-        const title = node.dataset.title || "";
-        const caption = node.dataset.caption || node.dataset.subtitle || "";
-        const img = node.querySelector("img");
-        const fallbackPoster = posterUrl || img?.getAttribute("data-src") || img?.getAttribute("src") || "";
+        let media = [];
+        if (node.dataset.media) {
+          try {
+            const parsed = JSON.parse(node.dataset.media);
+            if (Array.isArray(parsed)) {
+              media = parsed.map(normalizeMediaItem).filter((item) => item.mediaUrl || item.posterUrl);
+            }
+          } catch (error) {
+            media = [];
+          }
+        }
+        if (!media.length) {
+          const mediaUrl = node.dataset.mediaUrl || node.dataset.mediaSrc || "";
+          const mediaType = normalizeMediaType(node.dataset.mediaType);
+          const posterUrl = node.dataset.posterUrl || node.dataset.poster || "";
+          const img = node.querySelector("img");
+          const fallbackPoster = posterUrl || img?.getAttribute("data-src") || img?.getAttribute("src") || "";
+          if (mediaUrl || fallbackPoster) {
+            media = [{ mediaUrl, mediaType, posterUrl: fallbackPoster }];
+          }
+        }
         return {
           id: node.dataset.storyId || "",
-          mediaUrl,
-          mediaType,
-          posterUrl: fallbackPoster,
-          title,
-          caption,
+          title: node.dataset.title || "",
+          caption: node.dataset.caption || node.dataset.subtitle || "",
+          media,
+          activeMediaIndex: 0,
         };
       })
-      .filter((item) => item.mediaUrl || item.posterUrl);
+      .filter((item) => item.media.length);
   };
 
   const createOverlay = () => {
@@ -70,24 +90,60 @@
     document.body.appendChild(overlay);
     track = overlay.querySelector(".stories-overlay__track");
     progress = overlay.querySelector(".stories-overlay__progress");
+    let swipePointerId = null;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let swipeHandled = false;
 
     overlay.addEventListener("click", (event) => {
       if (event.target.closest("[data-stories-close]")) {
         closeStories();
       }
       if (event.target.closest("[data-stories-prev]")) {
-        scrollBy(-1);
+        moveMedia(-1);
       }
       if (event.target.closest("[data-stories-next]")) {
-        scrollBy(1);
+        moveMedia(1);
       }
     });
+
+    track.addEventListener("pointerdown", (event) => {
+      swipePointerId = event.pointerId;
+      swipeStartX = event.clientX;
+      swipeStartY = event.clientY;
+      swipeHandled = false;
+      track.setPointerCapture(event.pointerId);
+    });
+
+    track.addEventListener("pointermove", (event) => {
+      if (swipePointerId !== event.pointerId || swipeHandled) return;
+      const dx = event.clientX - swipeStartX;
+      const dy = event.clientY - swipeStartY;
+      if (Math.abs(dx) < 30 || Math.abs(dx) < Math.abs(dy)) return;
+      event.preventDefault();
+      swipeHandled = true;
+      if (dx < 0) {
+        moveMedia(1);
+      } else {
+        moveMedia(-1);
+      }
+    });
+
+    const endSwipe = (event) => {
+      if (swipePointerId === event.pointerId) {
+        track.releasePointerCapture(event.pointerId);
+        swipePointerId = null;
+      }
+    };
+
+    track.addEventListener("pointerup", endSwipe);
+    track.addEventListener("pointercancel", endSwipe);
 
     document.addEventListener("keydown", (event) => {
       if (!overlay?.classList.contains("is-open")) return;
       if (event.key === "Escape") closeStories();
-      if (event.key === "ArrowLeft") scrollBy(-1);
-      if (event.key === "ArrowRight") scrollBy(1);
+      if (event.key === "ArrowLeft") moveMedia(-1);
+      if (event.key === "ArrowRight") moveMedia(1);
     });
 
     window.addEventListener("popstate", (event) => {
@@ -124,8 +180,8 @@
     `;
   };
 
-  const showFallback = (container, story, reason, retry) => {
-    const poster = story.posterUrl || "";
+  const showFallback = (container, story, media, reason, retry) => {
+    const poster = media?.posterUrl || "";
     container.innerHTML = `
       <div class="stories-overlay__fallback">
         ${poster ? `<img src="${poster}" alt="${story.title || "Воспоминание"}" loading="lazy" />` : ""}
@@ -137,7 +193,7 @@
     container.querySelector(".stories-overlay__retry")?.addEventListener("click", () => retry(container));
   };
 
-  const loadImage = (container, story, src, eager) => {
+  const loadImage = (container, story, media, src, eager) => {
     const img = new Image();
     img.decoding = "async";
     img.loading = eager ? "eager" : "lazy";
@@ -151,22 +207,22 @@
     };
     img.onerror = () => {
       clearTimeoutFor(container);
-      showFallback(container, story, "image-error", (target) => loadImage(target, story, src, true));
+      showFallback(container, story, media, "image-error", (target) => loadImage(target, story, media, src, true));
     };
     img.src = src;
   };
 
-  const loadVideo = (container, story, src, eager, isActive) => {
+  const loadVideo = (container, story, media, src, eager, isActive) => {
     if (!src) {
       clearTimeoutFor(container);
-      showFallback(container, story, "video-no-src", (target) => loadVideo(target, story, src, true, true));
+      showFallback(container, story, media, "video-no-src", (target) => loadVideo(target, story, media, src, true, true));
       return;
     }
     const video = document.createElement("video");
     video.playsInline = true;
     video.muted = true;
     video.preload = eager ? "metadata" : "none";
-    if (story.posterUrl) video.poster = story.posterUrl;
+    if (media?.posterUrl) video.poster = media.posterUrl;
     container.appendChild(video);
     video.addEventListener("loadeddata", () => {
       clearTimeoutFor(container);
@@ -184,14 +240,14 @@
     });
     video.addEventListener("error", () => {
       clearTimeoutFor(container);
-      showFallback(container, story, "video-error", (target) => loadVideo(target, story, src, true, true));
+      showFallback(container, story, media, "video-error", (target) => loadVideo(target, story, media, src, true, true));
     });
     video.src = src;
     video.load();
   };
 
-  const renderMedia = (container, story, shouldLoad, isActive) => {
-    if (!story.mediaUrl) {
+  const renderMedia = (container, story, media, shouldLoad, isActive) => {
+    if (!media?.mediaUrl) {
       container.dataset.loaded = "1";
       showPlaceholder(container, "Контент будет добавлен позже");
       return;
@@ -199,37 +255,37 @@
 
     if (!shouldLoad) {
       container.dataset.loaded = "0";
-      container.innerHTML = story.posterUrl
-        ? `<img src="${story.posterUrl}" alt="${story.title || "Воспоминание"}" loading="lazy" />`
+      container.innerHTML = media.posterUrl
+        ? `<img src="${media.posterUrl}" alt="${story.title || "Воспоминание"}" loading="lazy" />`
         : `<div class="stories-overlay__placeholder"></div>`;
       return;
     }
 
-    if (container.dataset.loaded === "1" && container.dataset.src === story.mediaUrl) {
+    if (container.dataset.loaded === "1" && container.dataset.src === media.mediaUrl) {
       return;
     }
 
     container.dataset.loaded = "0";
-    container.dataset.src = story.mediaUrl;
+    container.dataset.src = media.mediaUrl;
     container.innerHTML = `<div class="stories-overlay__spinner" aria-hidden="true"></div>`;
 
     setTimeoutFor(container, () => {
       const retry = (target) => {
         const bust = `v=${Date.now()}`;
-        const nextSrc = story.mediaUrl.includes("?") ? `${story.mediaUrl}&${bust}` : `${story.mediaUrl}?${bust}`;
-        if (story.mediaType === "video") {
-          loadVideo(target, story, nextSrc, true, true);
+        const nextSrc = media.mediaUrl.includes("?") ? `${media.mediaUrl}&${bust}` : `${media.mediaUrl}?${bust}`;
+        if (media.mediaType === "video") {
+          loadVideo(target, story, media, nextSrc, true, true);
         } else {
-          loadImage(target, story, nextSrc, true);
+          loadImage(target, story, media, nextSrc, true);
         }
       };
-      showFallback(container, story, "timeout", retry);
+      showFallback(container, story, media, "timeout", retry);
     });
 
-    if (story.mediaType === "video") {
-      loadVideo(container, story, story.mediaUrl, isActive, isActive);
+    if (media.mediaType === "video") {
+      loadVideo(container, story, media, media.mediaUrl, isActive, isActive);
     } else {
-      loadImage(container, story, story.mediaUrl, isActive);
+      loadImage(container, story, media, media.mediaUrl, isActive);
     }
   };
 
@@ -242,36 +298,80 @@
       if (!story) return;
       const media = card.querySelector(".stories-overlay__media");
       if (!media) return;
-      const shouldLoad = Math.abs(index - activeIndex) <= WINDOW_SIZE;
-      renderMedia(media, story, shouldLoad, index === activeIndex);
+      const isActiveStory = index === activeStoryIndex;
+      const mediaIndex = isActiveStory ? story.activeMediaIndex : 0;
+      const currentMedia = story.media[mediaIndex] || story.media[0];
+      const shouldLoad = isActiveStory && Math.abs(mediaIndex - story.activeMediaIndex) <= WINDOW_SIZE;
+      renderMedia(media, story, currentMedia, shouldLoad, isActiveStory);
     });
   };
 
   const updateProgress = () => {
     if (!progress) return;
-    progress.querySelectorAll(".stories-overlay__segment").forEach((segment, index) => {
-      segment.classList.toggle("is-active", index === activeIndex);
-      segment.classList.toggle("is-done", index < activeIndex);
-    });
+    progress.innerHTML = "";
+    const story = items[activeStoryIndex];
+    const total = story?.media?.length || 0;
+    const activeMediaIndex = story?.activeMediaIndex || 0;
+    for (let i = 0; i < Math.max(total, 1); i += 1) {
+      const segment = document.createElement("span");
+      segment.className = "stories-overlay__segment";
+      if (i === activeMediaIndex) segment.classList.add("is-active");
+      if (i < activeMediaIndex) segment.classList.add("is-done");
+      progress.appendChild(segment);
+    }
   };
 
-  const setActiveIndex = (index) => {
-    activeIndex = Math.max(0, Math.min(index, items.length - 1));
+  const pauseAllVideos = () => {
+    track.querySelectorAll("video").forEach((video) => video.pause());
+  };
+
+  const setActiveMedia = (index) => {
+    const story = items[activeStoryIndex];
+    if (!story) return;
+    const nextIndex = Math.max(0, Math.min(index, story.media.length - 1));
+    story.activeMediaIndex = nextIndex;
     updateWindow();
     updateProgress();
-    track.querySelectorAll("video").forEach((video) => {
-      if (video.closest(`[data-index="${activeIndex}"]`)) {
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-      }
-    });
+    pauseAllVideos();
+    const activeCard = track.querySelector(`[data-index="${activeStoryIndex}"]`);
+    activeCard?.querySelector("video")?.play().catch(() => {});
+  };
+
+  const setActiveStory = (index) => {
+    const nextStoryIndex = Math.max(0, Math.min(index, items.length - 1));
+    activeStoryIndex = nextStoryIndex;
+    const story = items[activeStoryIndex];
+    if (story && !Number.isFinite(story.activeMediaIndex)) {
+      story.activeMediaIndex = 0;
+    }
+    updateWindow();
+    updateProgress();
+    pauseAllVideos();
+    const activeCard = track.querySelector(`[data-index="${activeStoryIndex}"]`);
+    activeCard?.querySelector("video")?.play().catch(() => {});
   };
 
   const scrollBy = (direction) => {
     if (!track) return;
-    const next = Math.max(0, Math.min(activeIndex + direction, items.length - 1));
+    const next = Math.max(0, Math.min(activeStoryIndex + direction, items.length - 1));
     track.scrollTo({ left: next * track.clientWidth, behavior: "smooth" });
+  };
+
+  const moveMedia = (direction) => {
+    const story = items[activeStoryIndex];
+    if (!story) return;
+    const nextMediaIndex = story.activeMediaIndex + direction;
+    if (nextMediaIndex >= 0 && nextMediaIndex < story.media.length) {
+      setActiveMedia(nextMediaIndex);
+      return;
+    }
+    const nextStory = activeStoryIndex + direction;
+    if (nextStory < 0 || nextStory >= items.length) return;
+    const targetMediaIndex = direction > 0 ? 0 : (items[nextStory].media.length - 1);
+    items[nextStory].activeMediaIndex = Math.max(0, targetMediaIndex);
+    scrollBy(direction);
+    setActiveStory(nextStory);
+    setActiveMedia(items[nextStory].activeMediaIndex);
   };
 
   const buildOverlayItems = () => {
@@ -292,10 +392,6 @@
         </div>
       `;
       track.appendChild(item);
-
-      const segment = document.createElement("span");
-      segment.className = "stories-overlay__segment";
-      progress.appendChild(segment);
     });
   };
 
@@ -310,7 +406,8 @@
     document.body.classList.add("body--locked");
     requestAnimationFrame(() => {
       track.scrollLeft = track.clientWidth * index;
-      setActiveIndex(index);
+      setActiveStory(index);
+      setActiveMedia(items[index]?.activeMediaIndex || 0);
     });
 
     if (observer) observer.disconnect();
@@ -319,7 +416,10 @@
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return;
           const idx = Number(entry.target.dataset.index);
-          if (Number.isFinite(idx)) setActiveIndex(idx);
+          if (Number.isFinite(idx)) {
+            setActiveStory(idx);
+            setActiveMedia(items[idx]?.activeMediaIndex || 0);
+          }
         });
       },
       { root: track, threshold: VISIBILITY_THRESHOLD }

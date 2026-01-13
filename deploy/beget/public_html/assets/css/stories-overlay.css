@@ -114,7 +114,7 @@
   scroll-snap-stop: always;
   display: flex;
   scrollbar-width: none;
-  touch-action: pan-x;
+  touch-action: pan-y;
 }
 
 .stories-overlay__track::-webkit-scrollbar {

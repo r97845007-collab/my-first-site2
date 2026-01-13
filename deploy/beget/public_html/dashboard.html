@@ -91,9 +91,10 @@
                 <input name="hashtags" type="text" />
               </label>
               <label class="input input--full">
-                <span>Медиа (фото/видео)</span>
-                <input name="media" type="file" accept="image/*,video/*" />
+                <span>Медиа (фото/видео, до 6)</span>
+                <input name="media" type="file" accept="image/*,video/mp4" multiple />
               </label>
+              <div class="admin-media-list" id="story-media-list"></div>
               <button class="btn" type="submit">Опубликовать</button>
             </form>
             <h3>Список постов</h3>

@@ -28,13 +28,38 @@ const postForm = document.getElementById("post-form");
 const storyForm = document.getElementById("story-form");
 const calendarForm = document.getElementById("calendar-form");
 
-const MAX_VIDEO_MB = 50;
-const RECOMMENDED_VIDEO_SECONDS = 60;
+const MAX_VIDEO_MB = 20;
+const MAX_IMAGE_MB = 10;
+const RECOMMENDED_VIDEO_SECONDS = 20;
 const LONG_VIDEO_SECONDS = 180;
 const VIDEO_THUMB_SIZE = 256;
 
-let storyThumbBlob = null;
-let storyThumbPreview = null;
+let storyMediaFiles = [];
+let storyMediaPreviewUrls = new Map();
+let storyVideoThumbBlob = null;
+let storyVideoThumbIndex = null;
+let storyVideoThumbPreviewUrl = null;
+let storyMediaList = null;
+let storyVideoDurations = new Map();
+let storyStatusEl = null;
+
+const resetStoryMediaState = () => {
+  storyMediaPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  storyMediaPreviewUrls = new Map();
+  if (storyVideoThumbPreviewUrl) {
+    URL.revokeObjectURL(storyVideoThumbPreviewUrl);
+    storyVideoThumbPreviewUrl = null;
+  }
+  storyMediaFiles = [];
+  storyVideoThumbBlob = null;
+  storyVideoThumbIndex = null;
+  storyVideoDurations = new Map();
+  if (storyMediaList) storyMediaList.innerHTML = "";
+  if (storyStatusEl) {
+    storyStatusEl.textContent = "";
+    storyStatusEl.classList.remove("warning", "alert");
+  }
+};
 
 const extractVideoThumb = async (file, opts = {}) => {
   const timeoutMs = opts.timeoutMs || 35000;
@@ -120,24 +145,22 @@ const setupStoryMediaValidation = () => {
   if (!storyForm) return;
   const input = storyForm.querySelector('input[name="media"]');
   if (!input) return;
-  const status = document.createElement("div");
-  status.className = "hint";
-  input.parentElement.appendChild(status);
-
-  storyThumbPreview = document.createElement("img");
-  storyThumbPreview.className = "admin-thumb";
-  storyThumbPreview.style.display = "none";
-  input.parentElement.appendChild(storyThumbPreview);
+  storyStatusEl = document.createElement("div");
+  storyStatusEl.className = "hint";
+  input.parentElement.appendChild(storyStatusEl);
+  storyMediaList = document.getElementById("story-media-list");
 
   const resetStatus = () => {
-    status.textContent = "";
-    status.classList.remove("warning", "alert");
+    if (!storyStatusEl) return;
+    storyStatusEl.textContent = "";
+    storyStatusEl.classList.remove("warning", "alert");
   };
 
   const setStatus = (message, type) => {
-    status.textContent = message;
-    status.classList.remove("warning", "alert");
-    if (type) status.classList.add(type);
+    if (!storyStatusEl) return;
+    storyStatusEl.textContent = message;
+    storyStatusEl.classList.remove("warning", "alert");
+    if (type) storyStatusEl.classList.add(type);
   };
 
   const fileIsMp4 = (file) => {
@@ -145,57 +168,170 @@ const setupStoryMediaValidation = () => {
     return file.name.toLowerCase().endsWith(".mp4");
   };
 
-  input.addEventListener("change", () => {
+  const fileIsImage = (file) => file.type.startsWith("image/");
+
+  const formatBytes = (value) => {
+    const mb = value / (1024 * 1024);
+    return `${mb.toFixed(1)} MB`;
+  };
+
+
+  const updateVideoDuration = (file) => {
+    const tempVideo = document.createElement("video");
+    tempVideo.preload = "metadata";
+    const objectUrl = URL.createObjectURL(file);
+    tempVideo.src = objectUrl;
+    tempVideo.onloadedmetadata = () => {
+      URL.revokeObjectURL(objectUrl);
+      const duration = Math.round(tempVideo.duration || 0);
+      storyVideoDurations.set(file, duration);
+      if (duration >= LONG_VIDEO_SECONDS) {
+        setStatus(`Warning: very long video (${duration}s). Recommended <= ${RECOMMENDED_VIDEO_SECONDS}s.`, "warning");
+      } else if (duration > RECOMMENDED_VIDEO_SECONDS) {
+        setStatus(`Warning: video duration ${duration}s (recommended <= ${RECOMMENDED_VIDEO_SECONDS}s).`, "warning");
+      }
+      renderStoryMediaList();
+    };
+  };
+
+  const renderStoryMediaList = () => {
+    if (!storyMediaList) return;
+    storyMediaList.innerHTML = "";
+    storyMediaFiles.forEach((file, index) => {
+      const isVideo = file.type.startsWith("video/");
+      let previewUrl = storyMediaPreviewUrls.get(file);
+      if (!previewUrl && fileIsImage(file)) {
+        previewUrl = URL.createObjectURL(file);
+        storyMediaPreviewUrls.set(file, previewUrl);
+      }
+      const duration = storyVideoDurations.get(file);
+      const item = document.createElement("div");
+      item.className = "admin-media-item";
+      const thumbContent = isVideo
+        ? `<div class="admin-media-thumb" style="display:flex;align-items:center;justify-content:center;font-size:12px;">VIDEO</div>`
+        : previewUrl
+          ? `<img class="admin-media-thumb" src="${previewUrl}" alt="Preview" />`
+          : `<div class="admin-media-thumb"></div>`;
+      const thumbOverride =
+        isVideo && storyVideoThumbBlob && storyVideoThumbIndex === index
+          ? `<img class="admin-media-thumb" src="${storyVideoThumbPreviewUrl || ""}" alt="Video thumb" />`
+          : thumbContent;
+      item.innerHTML = `
+        ${thumbOverride}
+        <div class="admin-media-meta">
+          <strong>${file.name}</strong>
+          <span>${isVideo ? "Video (MP4)" : "Image"} · ${formatBytes(file.size)}</span>
+          ${isVideo && Number.isFinite(duration) ? `<span>Duration: ${duration}s</span>` : ""}
+        </div>
+        <div class="admin-media-actions">
+          <button type="button" data-action="up" data-index="${index}">Up</button>
+          <button type="button" data-action="down" data-index="${index}">Down</button>
+          <button type="button" data-action="remove" data-index="${index}">Remove</button>
+        </div>
+      `;
+      storyMediaList.appendChild(item);
+    });
+  };
+
+  const applySelection = (files) => {
     resetStatus();
-    storyThumbBlob = null;
-    if (storyThumbPreview) {
-      storyThumbPreview.src = "";
-      storyThumbPreview.style.display = "none";
-    }
-    const file = input.files?.[0];
-    if (!file) return;
+    resetStoryMediaState();
 
-    const isVideo = file.type.startsWith("video/") || fileIsMp4(file);
-    if (isVideo && !fileIsMp4(file)) {
-      setStatus("Only MP4 video is allowed.", "alert");
-      input.value = "";
-      return;
-    }
-
-    if (isVideo && file.size > MAX_VIDEO_MB * 1024 * 1024) {
-      setStatus(`Video is larger than ${MAX_VIDEO_MB}MB.`, "alert");
-      input.value = "";
-      return;
-    }
-
-    if (isVideo) {
-      const tempVideo = document.createElement("video");
-      tempVideo.preload = "metadata";
-      const objectUrl = URL.createObjectURL(file);
-      tempVideo.src = objectUrl;
-      tempVideo.onloadedmetadata = () => {
-        URL.revokeObjectURL(objectUrl);
-        const duration = Math.round(tempVideo.duration || 0);
-        if (duration >= LONG_VIDEO_SECONDS) {
-          setStatus(`Warning: long video (${duration}s). Recommended <= ${RECOMMENDED_VIDEO_SECONDS}s.`, "warning");
+    const next = [];
+    let videoCount = 0;
+    files.forEach((file) => {
+      const isVideo = file.type.startsWith("video/") || fileIsMp4(file);
+      if (isVideo && !fileIsMp4(file)) {
+        setStatus("Only MP4 video is allowed.", "alert");
+        return;
+      }
+      if (isVideo) {
+        videoCount += 1;
+        if (videoCount > 1) {
+          setStatus("Only one video is allowed per story.", "alert");
+          videoCount -= 1;
           return;
         }
-        if (duration > RECOMMENDED_VIDEO_SECONDS) {
-          setStatus(`Warning: video duration ${duration}s (recommended <= ${RECOMMENDED_VIDEO_SECONDS}s).`, "warning");
+        if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+          setStatus(`Video is larger than ${MAX_VIDEO_MB}MB.`, "alert");
           return;
         }
-        setStatus(`Duration: ${duration}s.`, "");
-      };
-
-      extractVideoThumb(file).then((result) => {
-        if (!result?.blob) return;
-        storyThumbBlob = result.blob;
-        if (storyThumbPreview) {
-          storyThumbPreview.src = URL.createObjectURL(result.blob);
-          storyThumbPreview.style.display = "block";
+      } else if (fileIsImage(file)) {
+        if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+          setStatus(`Image is larger than ${MAX_IMAGE_MB}MB.`, "alert");
+          return;
         }
-      });
+      } else {
+        setStatus("Only images or MP4 videos are allowed.", "alert");
+        return;
+      }
+      next.push(file);
+    });
+
+    if (next.length > 6) {
+      setStatus("Maximum 6 files per story.", "alert");
+      next.splice(6);
     }
+
+    storyMediaFiles = next;
+    storyMediaFiles.forEach((file, index) => {
+      if (file.type.startsWith("video/")) {
+        updateVideoDuration(file);
+        extractVideoThumb(file).then((result) => {
+          if (!result?.blob) return;
+          storyVideoThumbBlob = result.blob;
+          storyVideoThumbIndex = index;
+          if (storyVideoThumbPreviewUrl) URL.revokeObjectURL(storyVideoThumbPreviewUrl);
+          storyVideoThumbPreviewUrl = URL.createObjectURL(result.blob);
+          renderStoryMediaList();
+        });
+      }
+    });
+    renderStoryMediaList();
+  };
+
+  input.addEventListener("change", () => {
+    const files = Array.from(input.files || []);
+    applySelection(files);
+    input.value = "";
+  });
+
+  storyMediaList?.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const action = button.dataset.action;
+    const index = Number(button.dataset.index);
+    if (!Number.isFinite(index)) return;
+    if (action === "remove") {
+      storyMediaFiles.splice(index, 1);
+      if (storyVideoThumbIndex === index) {
+        storyVideoThumbBlob = null;
+        storyVideoThumbIndex = null;
+      } else if (storyVideoThumbIndex !== null && storyVideoThumbIndex > index) {
+        storyVideoThumbIndex -= 1;
+      }
+    }
+    if (action === "up" && index > 0) {
+      const temp = storyMediaFiles[index - 1];
+      storyMediaFiles[index - 1] = storyMediaFiles[index];
+      storyMediaFiles[index] = temp;
+      if (storyVideoThumbIndex === index) {
+        storyVideoThumbIndex = index - 1;
+      } else if (storyVideoThumbIndex === index - 1) {
+        storyVideoThumbIndex = index;
+      }
+    }
+    if (action === "down" && index < storyMediaFiles.length - 1) {
+      const temp = storyMediaFiles[index + 1];
+      storyMediaFiles[index + 1] = storyMediaFiles[index];
+      storyMediaFiles[index] = temp;
+      if (storyVideoThumbIndex === index) {
+        storyVideoThumbIndex = index + 1;
+      } else if (storyVideoThumbIndex === index + 1) {
+        storyVideoThumbIndex = index;
+      }
+    }
+    renderStoryMediaList();
   });
 };
 
@@ -203,11 +339,16 @@ const tabButtons = document.querySelectorAll(".tab-button");
 const tabPanels = document.querySelectorAll(".tab-panel");
 
 const renderMediaPreview = (item) => {
-  if (!item?.media_url) return "";
-  if (item.media_kind === "video") {
-    return `<video class="admin-thumb" controls src="${item.media_url}"></video>`;
+  const mediaList = Array.isArray(item?.media) ? item.media : [];
+  const first = mediaList[0];
+  const mediaUrl = first?.media_url || item?.media_url || "";
+  const mediaType = first?.media_type || item?.media_kind || "";
+  const thumbUrl = first?.thumb_url || first?.poster_url || "";
+  if (!mediaUrl && !thumbUrl) return "";
+  if (String(mediaType).includes("video")) {
+    return `<img class="admin-thumb" src="${thumbUrl || mediaUrl}" alt="Preview" loading="lazy" />`;
   }
-  return `<img class="admin-thumb" src="${item.media_url}" alt="Медиа" loading="lazy" />`;
+  return `<img class="admin-thumb" src="${thumbUrl || mediaUrl}" alt="Медиа" loading="lazy" />`;
 };
 
 const showTab = (tab) => {
@@ -346,8 +487,12 @@ const handleStorySubmit = async (event) => {
   event.preventDefault();
   try {
     const data = new FormData(storyForm);
-    if (storyThumbBlob) {
-      data.append("video_thumb", storyThumbBlob, "thumb.jpg");
+    storyMediaFiles.forEach((file) => {
+      data.append("media[]", file);
+    });
+    if (storyVideoThumbBlob && storyVideoThumbIndex !== null) {
+      data.append("video_thumb", storyVideoThumbBlob, "thumb.jpg");
+      data.append("video_thumb_index", String(storyVideoThumbIndex));
     }
     const response = await fetch("/api/admin-stories.php", {
       method: "POST",
@@ -359,11 +504,7 @@ const handleStorySubmit = async (event) => {
       throw new Error(payload.error || "Ошибка сохранения воспоминания");
     }
     storyForm.reset();
-    storyThumbBlob = null;
-    if (storyThumbPreview) {
-      storyThumbPreview.src = "";
-      storyThumbPreview.style.display = "none";
-    }
+    resetStoryMediaState();
     await loadStories();
   } catch (error) {
     alert(error.message);

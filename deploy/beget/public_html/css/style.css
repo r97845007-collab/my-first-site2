@@ -1564,6 +1564,54 @@ td {
   object-fit: cover;
 }
 
+.admin-media-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.admin-media-item {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.admin-media-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.admin-media-meta {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.admin-media-meta strong {
+  font-size: 14px;
+}
+
+.admin-media-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-media-actions button {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+}
+
 .comment-body {
   display: grid;
   gap: 12px;
