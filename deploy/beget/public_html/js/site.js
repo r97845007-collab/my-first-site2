@@ -402,18 +402,26 @@ const renderStories = () => {
     const poster = story.poster_url || story.poster || story.thumbnail_url || "";
     const fallbackImage = ASSETS.story;
     const isVideo = mediaKind === "video";
+    const thumbSrc = poster || mediaUrl || "";
     const card = document.createElement("button");
     card.type = "button";
     card.className = "story-thumb stories__item";
     card.dataset.storyId = story.id;
-    card.dataset.mediaType = isVideo ? "video" : "photo";
+    card.dataset.mediaType = isVideo ? "video" : "image";
     card.dataset.mediaSrc = mediaUrl;
+    card.dataset.mediaUrl = mediaUrl;
     card.dataset.poster = poster;
+    card.dataset.posterUrl = poster;
     card.dataset.title = title;
     card.dataset.subtitle = subtitle;
+    card.dataset.caption = subtitle;
     card.innerHTML = `
       <span class="story-thumb__media">
-        <img src="${poster || mediaUrl || fallbackImage}" alt="Воспоминание ${title}" loading="lazy" />
+        ${
+          thumbSrc
+            ? `<img src="${thumbSrc}" alt="Воспоминание ${title}" loading="lazy" />`
+            : `<span class="story-thumb__placeholder" aria-hidden="true"></span>`
+        }
       </span>
       <span class="story-thumb__caption">${title}</span>
     `;
